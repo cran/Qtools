@@ -15,30 +15,50 @@ This function calculates quantile-based summary statistics for location, scale a
 \usage{
 qlss(...)
 \method{qlss}{default}(fun = "qnorm", probs = 0.1, ...)
-\method{qlss}{formula}(formula, data, type = "rq", tsf = NULL, symm = TRUE, dbounded = FALSE,
-lambda.p = NULL, delta.p = NULL, lambda.q = NULL, delta.q = NULL,
-probs = 0.1, ci = FALSE, R = 500, predictLs = NULL, ...)
 \method{qlss}{numeric}(x, probs = 0.1, ...)
+\method{qlss}{formula}(formula, probs = 0.1, data = sys.frame(sys.parent()), subset, weights,
+	na.action, contrasts = NULL, method = "fn", type = "rq", tsf = "mcjI",
+	symm = TRUE, dbounded = FALSE, lambda = NULL, conditional = FALSE, ...)
 }
 
 \arguments{
   \item{fun}{
 quantile function.
 }
+\item{x}{
+a numeric vector.
+}
+  \item{formula}{
+an object of class \code{\link{formula}}: a symbolic description of the model to be fitted. The details of model specification are given under "Details".
+}
   \item{probs}{
 a vector of probabilities.
 }
-  \item{formula}{
-an object of class \code{\link{formula}}: a symbolic description of the model to be fitted. The details of model specification are given under 'Details'.
-}
   \item{data}{
-a data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model.
+an optional data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model. By default the variables are taken from the environment from which the call is made.
 }
+  \item{subset}{
+an optional vector specifying a subset of observations to be used in the fitting process.
+}
+  \item{weights}{
+an optional vector of weights to be used in the fitting process. Should be NULL or a numeric vector. 
+}
+  \item{na.action}{
+a function which indicates what should happen when the data contain \code{NA}s.
+}
+  \item{contrasts}{
+an optional list. See the \code{contrasts.arg} of \code{\link{model.matrix.default}}.
+}
+
+  \item{method}{
+the algorithm used to solve the linear program. See \code{\link{rq}} for further details. The Frisch-Newton interior point method is the default.
+}
+
   \item{type}{
-possible options are \code{rq} for quantile regression (default) or \code{rqt} for transformation-based quantile regression.
+possible options are \code{rq} for linear quantile regression (default) or \code{rqt} for transformation-based quantile regression.
 }
   \item{tsf}{
-transformation to be used. Possible options are \code{mcjI} for Proposal I transformation models (default), \code{mcjI} for Proposal II transformation models, \code{bc} for Box-Cox and \code{ao} for Aranda-Ordaz transformation models.
+transformation to be used. Possible options are \code{mcjI} for Proposal I transformation models (default), \code{bc} for Box-Cox and \code{ao} for Aranda-Ordaz transformation models. See \code{\link{tsrq}} for further details.
 }
   \item{symm}{
 logical flag. If \code{TRUE} (default) a symmetric transformation is used.
@@ -46,41 +66,36 @@ logical flag. If \code{TRUE} (default) a symmetric transformation is used.
   \item{dbounded}{
 logical flag. If \code{TRUE} the response is assumed to be doubly bounded on [a,b]. If \code{FALSE} the response is assumed to be singly bounded (ie, strictly positive).
 }
-  \item{lambda.p, delta.p}{
-vectors with values of transformation parameters to fit models for quantiles \code{probs}. Must be the same length as \code{probs}.
+
+  \item{lambda}{
+values of transformation parameters for grid search.
 }
-  \item{lambda.q, delta.q}{
-vectors with values of transformation parameters to fit models for quantiles \code{1-probs}. Must be the same length as \code{probs}.
+  \item{conditional}{
+logical flag. If \code{TRUE}, the transformation parameter is assumed to be known and this must be provided via the arguments \code{lambda} using a vector of length \code{3 + 2 x length(probs)} (see details).
 }
- \item{ci}{
-logical flag. If \code{TRUE}, bootstrapped confidence intervals for the predictions are calculated.
-}
- \item{R}{
-number of bootstrap replications.
-}
-\item{x}{
-a numeric vector.
-}
-  \item{predictLs}{
-list of arguments for \code{predict.rq}.
-}
+
   \item{\dots}{
 other arguments for \code{fun}, \code{rq} or \code{tsrq}.
 }
 }
 
 \details{
-This function computes a number of quantile-based summary statistics for location (median), scale (inter-quartile range), and shape (Bowley skewness and shape index) of a distribution. These statistics can be computed for unconditional and conditional distributions. In the latter case, a \code{formula} specifies a linear quantile function, which is fitted with \code{\link{rq}}. The default \code{qlss} function computes the summary statistics of a standard normal distribution or of any other distribution via the argument \code{fun}. The latter must be a function with \code{p} as its probability argument (see for example \code{\link{qnorm}}, \code{\link{qt}}, \code{\link{qchisq}}, \code{\link{qgamma}}, etc.)
+This function computes a number of quantile-based summary statistics for location (median), scale (inter-quartile range and inter-quantile range), and shape (Bowley skewness and shape index) of a distribution. These statistics can be computed for unconditional and conditional distributions.
 
-The argument \code{p} 
+Let \eqn{Y} be a continuous random variable and let \eqn{Q(p)} be its \emph{p}th quantile. The function \code{qlss} computes the median \eqn{Q(0.5)}, the inter-quartile range \eqn{IQR = Q(0.75) - Q(0.25)}, the inter-quantile range \eqn{IPR(p) = Q(1-p) - Q(p)}, the Bowley skewness index \eqn{A(p) = (Q(1-p) + Q(p) - 2Q(0.5))/IPR(p)}, and the shape index \eqn{T(p) = IPR(p)/IQR(p)}, for \eqn{0 < p < 0.25}.
+
+The default \code{qlss} function computes the summary statistics of a standard normal distribution or any other theoretical distribution via the argument \code{fun}. The latter must be a function with \code{p} as its probability argument (see for example \code{\link{qnorm}}, \code{\link{qt}}, \code{\link{qchisq}}, \code{\link{qgamma}}, etc.). When a variable \code{x} is provided, LSS measures are computed using empirical (sample) quantiles.
+
+The argument \code{formula} specifies a quantile function for \eqn{Y} conditional on predictors \eqn{X}. Linear models are fitted via standard quantile regression with \code{type = "rq"}. Nonlinear models are fitted via transformation-based quantile regression with \code{type = "rqt"} (proposal II transformation models are not available.). When \code{conditional = TRUE}, \code{lambda} is a vector of transformation parameters of length \code{3 + 2 x np}, where \code{np = length(probs)} (3 quartiles, \code{np} quantiles at level \eqn{p}, \code{np} quantiles at level \eqn{1 - p}).
+
 }
 
 \value{
-\code{qlss} returns an object of \code{\link{class}} \code{qlss}. This is a list that contains three elements:
+\code{qlss} returns an object of \code{\link{class}} \code{qlss}. This is a list that contains at least three elements:
 
 \item{location}{summary statistic(s) for location.}
 \item{scale}{summary statistic(s) for scale.}
-\item{method}{summary statistic(s) for shape.}
+\item{shape}{summary statistic(s) for shape.}
 
 }
 
@@ -119,7 +134,7 @@ plot(fit, z = trees2$Height, xlab = "height")
 }
 
 \seealso{
-\code{\link{rq}}, \code{\link{tsrq}}, \code{\link{tsrq2}}
+\code{\link{predict.qlss}}, \code{\link{plot.qlss}}
 }
 
 \keyword{conditional quantiles}

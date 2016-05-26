@@ -21,7 +21,7 @@ an object of \code{\link{class}} \code{rqt}.
 numeric value to determine the confidence level \code{(1-alpha)} of the required interval.
 }
   \item{se}{
-specifies the method used to compute standard errors for conditional (\code{conditional = TRUE}) inference on regression coefficients (see argument \code{se} in \code{\link{summary.rq}}). For unconditional inference (\code{conditional = FALSE}), bootstrap is the only method available.
+specifies the method used to compute standard errors. For conditional inference (\code{conditional = TRUE}), see argument \code{se} in \code{\link{summary.rq}}. For unconditional inference (\code{conditional = FALSE}), see details below.
 }
   \item{R}{
 number of bootstrap replications.
@@ -41,12 +41,15 @@ if \code{conditional = TRUE}, additional arguments for \code{\link{summary.rq}} 
 }
 
 \details{
-If inference is carried out conditionally on the transformation parameter (ie, assuming this is \emph{known} rather than estimated), any type of summary for regression quantiles can be used (see \code{\link{summary.rq}}). In general, conditional standard errors of the regression coefficients will be underestimated (Mu and He, 2007). A bootstrap approach is used for unconditional inference.
+If inference is carried out conditionally on the transformation parameter (ie, assuming this is \emph{known} rather than estimated), any type of summary for regression quantiles can be used (see \code{\link{summary.rq}}).
 
+For unconditional inference (\code{conditional = FALSE}), there are three methods available: \code{boot} for bootstrap; \code{iid} for large-\emph{n} approximation of the standard errors under IID assumptions; \code{nid} for large-\emph{n} approximation of the standard errors under NID assumptions. See Powell (1991), Chamberlain (1994) and Geraci and Jones (2015).
 }
 
 \references{
 Canty A and Ripley B (2014). boot: Bootstrap R (S-Plus) Functions. R package version 1.3-11.
+
+Chamberlain G. Quantile regression, censoring, and the structure of wages. In: Sims C, editor. Advances in Econometrics: Sixth World Congress. 1. Cambridge, UK: Cambridge University Press; 1994.
 
 Davison AC and Hinkley DV (1997). Bootstrap Methods and Their Applications. Cambridge University Press, Cambridge.
 
@@ -54,6 +57,7 @@ Geraci M and Jones MC. Improved transformation-based quantile regression. Canadi
 
 Mu YM, He XM. Power transformation toward a linear regression quantile. Journal of the American Statistical Association 2007;102(477):269-279.
 
+Powell JL. Estimation of monotonic regression models under quantile restrictions. In: Barnett W, Powell J, Tauchen G, editors. Nonparametric and Semiparametric Methods in Econometrics and Statistics: Proceedings of the Fifth International Symposium on Economic Theory and Econometrics. New York, NY: Cambridge University Press 1991. p. 357-84.
 }
 
 

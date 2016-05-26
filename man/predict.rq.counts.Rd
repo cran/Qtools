@@ -11,7 +11,8 @@ This function computes predictions based on fitted linear quantile models.
 
 \usage{
 \method{predict}{rq.counts}(object, newdata, offset,
-	na.action = na.pass, type = "response", ...)
+	na.action = na.pass, type = "response",
+	namevec = NULL, ...)
 }
 
 \arguments{
@@ -28,7 +29,10 @@ an offset to be used with \code{newdata}.
 function determining what should be done with missing values in \code{newdata}. The default is to predict \code{NA}.}
 
  \item{type}{
-the type of prediction required. The default "response" is on the scale of the response variable, i.e. the values are back-transformed using the inverse of the transformation \emph{hinv(Xb)}; the alternative "link" is on the scale of the linear predictors \emph{h(y) = Xb}.
+the type of prediction required. The default \code{"response"} is on the scale of the response variable, i.e. the values are back-transformed using the inverse of the transformation \eqn{h^{-1}(Xb)}; the alternative \code{"link"} is on the scale of the linear predictors \eqn{h(y) = Xb}; finally, predictions for marginal effects are given with \code{"maref"}.
+}
+ \item{namevec}{
+character giving the name of the covariate with respect to which the marginal effect is to be computed. If \code{type = "maref"}, this argument is required. See \code{\link{maref.rq.counts}}.
 }
   \item{\dots}{
 not used.
@@ -58,7 +62,7 @@ cbind(fit$fitted.values, predict(fit, type = "response"))
 
 
 \seealso{
-\code{\link{residuals.rq.counts}}, \code{\link{rq.counts}}, \code{\link{coef.rq.counts}}
+\code{\link{residuals.rq.counts}}, \code{\link{rq.counts}}, \code{\link{coef.rq.counts}}, \code{\link{maref.rq.counts}}
 }
 
 \keyword{predict}

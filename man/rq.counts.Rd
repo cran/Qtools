@@ -7,21 +7,21 @@ Quantile Regression for Counts}
 This function is used to fit a quantile regression model when the response is a count variable.
 }
 \usage{
-rq.counts(formula, tau = 0.5, data, tsf = "bc", symm = TRUE,
-	lambda = 0,	weights = NULL, offset = NULL, contrasts = NULL,
-	M = 50, zeta = 1e-05, B = 0.999, cn = NULL, alpha = 0.05,
-	method = "fn")
+rq.counts(formula, data = sys.frame(sys.parent()), tau = 0.5, tsf = "bc", symm = TRUE,
+	dbounded = FALSE, lambda = 0, subset, weights, na.action, contrasts = NULL,
+	offset = NULL, method = "fn", M = 50, zeta = 1e-5, B = 0.999, cn = NULL,
+	alpha = 0.05)
 }
 
 \arguments{
   \item{formula}{
 an object of class \code{\link{formula}}: a symbolic description of the model to be fitted.
 }
+  \item{data}{
+an optional data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model. If not found in data, the variables are taken from environment(formula), typically the environment from which \code{rq.counts} is called.
+}
   \item{tau}{
 quantile to be estimated.
-}
-  \item{data}{
-an optional data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model. If not found in data, the variables are taken from environment(formula), typically the environment from which lqm is called.
 }
   \item{tsf}{
 transformation to be used. Possible options are \code{mcjI} for Proposal I and \code{bc} for Box-Cox. The latter is the default, with \code{lambda = 0}, i.e. the logarithmic transformation.
@@ -29,31 +29,40 @@ transformation to be used. Possible options are \code{mcjI} for Proposal I and \
   \item{symm}{
 logical flag. If \code{TRUE} and \code{tsf = 'mcj'}, the symmetric Proposal I transformation is used.
 }
+  \item{dbounded}{
+logical flag. If \code{TRUE} the response is assumed to be doubly bounded on [a,b]. If \code{FALSE} (default) the response is assumed to be singly bounded (ie, strictly positive).
+}
   \item{lambda}{
 a numerical value for the transformation parameter. This is provided by the user or set to zero if not specified.
+}
+  \item{subset}{
+an optional vector specifying a subset of observations to be used in the fitting process.
 }
   \item{weights}{
 an optional vector of weights to be used in the fitting process.
 }
-
-  \item{offset}{
-an optional offset to be included in the model frame.  
+  \item{na.action}{
+a function which indicates what should happen when the data contain \code{NA}s.
 }
-
   \item{contrasts}{
 an optional list. See the \code{contrasts.arg} of \code{\link{model.matrix.default}}.
 }
+  \item{offset}{
+an optional offset to be included in the model frame.  
+}
+  \item{method}{
+estimation method for the fitting process. See \code{\link{rq}}.
+}
+
   \item{M}{
 number of dithered samples.
 }
   \item{zeta}{
 small constant (see References).
 }
-
   \item{B}{
 right boundary for uniform random noise U[0,B] to be added to the response variable (see References).
 }
-
  \item{cn}{
 small constant to be passed to \code{Fn} (see Theorem 3, Machado and Santos Silva).
 }
@@ -61,13 +70,10 @@ small constant to be passed to \code{Fn} (see Theorem 3, Machado and Santos Silv
  \item{alpha}{
 significance level.
 }
-  \item{method}{
-estimation method for the fitting process. See \code{\link{rq}}.
-}
 
 }
 
-\details{A linear quantile regression model is fitted to the log--transformed response. Additional tranformation functions will be implemented. The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2013). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.} 
+\details{A linear quantile regression model is fitted to the log--transformed response. The transformation of the response can be changed with arguments \code{tsf}, \code{symm}, \code{dbounded}, \code{lambda} (see \code{\link{bc}}). The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2013). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.} 
 
 \value{
 a list of class \code{rq.counts} containing the following components
@@ -124,5 +130,10 @@ lines(esterase$Esterase, fit2$fitted.values, col = "red")
 legend(8, 1000, lty = c(1,1), col = c("blue", "red"), legend = c("tau = 0.25","tau = 0.75"))
 
 }
+
+\seealso{
+\code{\link{residuals.rq.counts}}, \code{\link{predict.rq.counts}}, \code{\link{coef.rq.counts}}, \code{\link{maref.rq.counts}}
+}
+
 \keyword{conditional quantiles}
 \keyword{discrete}

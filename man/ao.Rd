@@ -29,7 +29,7 @@ invmcjII(x, lambda, delta, dbounded = FALSE)
 
 \arguments{
   \item{x, theta}{
-numeric vector of singly (\code{x}) or doubly (\code{theta}) bounded observations; \code{theta} must be between 0 and 1 (see \code{map} to map generic [a,b] intervals to [0,1]).
+numeric vector of singly (\code{x}) or doubly (\code{theta}) bounded observations; \code{theta} must be between 0 and 1 (see \code{\link{map}} to map generic [a,b] intervals to [0,1]).
 }
   \item{lambda, delta}{
 transformation parameters.
@@ -61,6 +61,8 @@ Transformed or back-transformed values.
 Aranda-Ordaz FJ. On two families of transformations to additivity for binary response data. Biometrika 1981;68(2):357-363.
 
 Box GEP, Cox DR. An analysis of transformations. Journal of the Royal Statistical Society Series B-Statistical Methodology 1964;26(2):211-252.
+
+Dehbi H-M, Cortina-Borja M, and Geraci M. Aranda-Ordaz quantile regression for student performance assessment. Journal of Applied Statistics. 2016;43(1):58-71.
 
 Geraci M and Jones MC. Improved transformation-based quantile regression. Canadian Journal of Statistics 2015;43(1):118-132.
 

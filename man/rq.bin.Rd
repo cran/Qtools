@@ -78,7 +78,7 @@ a list of class \code{rq.bin} containing the following components
 
 
 \references{
-Goffe WL, Ferrier GD, Rogers J. Global optimization of statistical functions with simulated annealing. Journal of Econometrics 1994;60(1):65-99. Code retrieved from \url{http://EconPapers.repec.org/RePEc:wpa:wuwppr:9406001}.
+Goffe WL, Ferrier GD, Rogers J. Global optimization of statistical functions with simulated annealing. Journal of Econometrics 1994;60(1):65-99. Code retrieved from \url{http://econpapers.repec.org/software/wpawuwppr/9406001.htm}.
 
 Kordas G. Smoothed binary regression quantiles. Journal of Applied Econometrics 2006;21(3):387-407. Code retrieved from \url{http://qed.econ.queensu.ca/jae/2006-v21.3/kordas/}.
 

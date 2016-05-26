@@ -48,7 +48,10 @@ Marco Geraci
 
 \examples{
 
+\dontrun{
 data(barro, package = "quantreg")
 fit <- quantreg::rq(y.net ~ lgdp2 + fse2 + gedy2 + Iy2 + gcony2, data = barro, tau = c(.1,.5,.9))
 GOFTest(fit)
+}
+
 }

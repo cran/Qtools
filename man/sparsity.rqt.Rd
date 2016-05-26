@@ -62,19 +62,18 @@ Marco Geraci
 
 \examples{
 
+\dontrun{
+
 data(trees)
 
 # 'rqt' object
 
-\dontrun{
 fit.rqt <- tsrq(Volume ~ Height, tsf = "bc", symm = FALSE, data = trees,
 	lambda = seq(-10, 10, by = 0.01), tau = 0.5)
 sparsity(fit.rqt)
-}
 
 # 'rq' object
 
-\dontrun{
 fit.rq <- rq(Volume ~ Height, data = trees)
 sparsity(fit.rq, se = "iid")
 sparsity(fit.rq, se = "nid")
@@ -87,4 +86,3 @@ sparsity(fit.rq, se = "ker")
 \code{\link{rq}}
 }
 
-\keyword{ location-scale-shape }

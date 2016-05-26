@@ -10,7 +10,7 @@ This function plots location, scale and shape of a conditional distribution.
 }
 
 \usage{
-\method{plot}{qlss}(x, z, which = 1, ci = FALSE, level = 0.95, type = "l", ...)
+\method{plot}{qlss}(x, z, which = 1, interval = FALSE, type = "l", ...)
 }
 
 \arguments{
@@ -18,16 +18,13 @@ This function plots location, scale and shape of a conditional distribution.
 an object of class \code{qlss} as returned by \code{\link{qlss.formula}}.
 }
   \item{z}{
-numeric vector.
+numeric vector of values against which LSS measures are plotted. This argument is required.
 }
   \item{which}{
 when \code{probs} in \code{qlss} is a vector, the argument \code{which} specifies which element of the vector should be used for plotting.
 }
- \item{ci}{
-logical flag. If \code{TRUE}, bootstrapped confidence intervals for the predictions are plotted.
-}
- \item{level}{
-if \code{ci = TRUE}, point-wise confidence intervals of a given \code{level} are plotted.
+ \item{interval}{
+logical flag. If \code{TRUE}, confidence intervals for the predictions are plotted.
 }
   \item{type}{
 1-character string giving the type of plot desired. See \code{\link{plot.default}}.
@@ -38,6 +35,12 @@ other arguments for \code{\link{plot.default}}.
 
 }
 
+\details{
+
+This function plots a \code{qlss} object from \code{\link{qlss}} or \code{\link{predict.qlss}}.
+
+
+}
 
 \author{
 Marco Geraci

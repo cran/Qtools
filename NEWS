@@ -8,3 +8,14 @@ Version 1.0 (February 2, 2016)
 
 =============================================
 
+Version 1.1 (May 26, 2016)
+
+- bugs fixed in mice.impute.rq and mice.impute.rrq
+- other bugs fixed
+- revised all documentation
+- revised qlss, tsrq functions
+- revised functions for marginal effects
+- new: predict.qlss, plot.qlss, print.qlss, plot.midecdf, plot.midquantile, print.midecdf, print.midquantile
+- changed midquantile.ci to confint.midquantile (S3 method)
+
+=============================================

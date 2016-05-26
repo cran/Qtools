@@ -7,7 +7,7 @@ Print Restricted Quantile Regression Models
 }
 
 \description{
-Print an object of class \code{rrq}.
+Print an object of class \code{rrq} or \code{summary.rrq}.
 }
 
 \usage{

@@ -19,14 +19,12 @@
 \alias{d2ao}
 \alias{d2mcjI}
 
-\alias{marefbc}
-\alias{marefao}
-\alias{marefmcjI}
+\alias{terms2expr}
 \alias{boot.rrq}
 \alias{boot.rqt}
 \alias{se.rqt}
-\alias{qlssFit.rq}
-\alias{qlssFit.rqt}
+\alias{qlssPredRq}
+\alias{qlssPredRqt}
 
 \alias{rcLoss}
 \alias{l1Loss}
