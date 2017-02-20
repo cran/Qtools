@@ -60,7 +60,7 @@ optional arguments passed to \code{rq.fit} or \code{rq.wfit}.
 \references{
 He X. Quantile curves without crossing. The American Statistician 1997;51(2):186-192.
 
-Koenker R (2013). quantreg: Quantile Regression. R package version 5.05. URL \url{http://CRAN.R-project.org/package=quantreg}.
+Koenker R. quantreg: Quantile Regression. 2016. R package version 5.29.
 }
 
 \author{

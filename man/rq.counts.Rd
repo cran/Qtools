@@ -73,7 +73,7 @@ significance level.
 
 }
 
-\details{A linear quantile regression model is fitted to the log--transformed response. The transformation of the response can be changed with arguments \code{tsf}, \code{symm}, \code{dbounded}, \code{lambda} (see \code{\link{bc}}). The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2013). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.} 
+\details{A linear quantile regression model is fitted to the log--transformed response. The transformation of the response can be changed with arguments \code{tsf}, \code{symm}, \code{dbounded}, \code{lambda} (see \code{\link{bc}}). The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2016). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.} 
 
 \value{
 a list of class \code{rq.counts} containing the following components
@@ -99,11 +99,13 @@ a list of class \code{rq.counts} containing the following components
 
 \references{
 
+Geraci M. Linear quantile mixed models: The lqmm package for Laplace quantile regression. Journal of Statistical Software. 2014;57(13):1-29.
+
 Geraci M and Jones MC. Improved transformation-based quantile regression. Canadian Journal of Statistics 2015;43(1):118-132.
 
-Koenker R (2013). quantreg: Quantile Regression. R package version 5.05. URL \url{http://CRAN.R-project.org/package=quantreg}.
+Koenker R. quantreg: Quantile Regression. 2016. R package version 5.29.
 
-Machado JAF and Santos Silva JMC (2005). Quantiles for counts. Journal of the American Statistical Association, 100(472), 1226--1237.
+Machado JAF, Santos Silva JMC. Quantiles for counts. Journal of the American Statistical Association. 2005;100(472):1226-37.
 }
 
 \author{

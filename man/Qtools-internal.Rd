@@ -28,6 +28,9 @@
 
 \alias{rcLoss}
 \alias{l1Loss}
+\alias{nlLoss}
+\alias{nl.fit.rqt}
+\alias{switch_check}
 \alias{addnoise}
 \alias{normalize}
 \alias{rcTest}

@@ -1,8 +1,8 @@
 Package: Qtools
 Type: Package
 Title: Utilities for Quantiles
-Version: 1.1
-Date: 2016-05-26
+Version: 1.2
+Date: 2017-02-18
 Author: Marco Geraci
 Maintainer: Marco Geraci <geraci@mailbox.sc.edu>
 Depends: R (>= 3.0.0)
@@ -13,6 +13,6 @@ Description: This is a collection of functions for unconditional and conditional
 License: GPL (>= 2)
 LazyLoad: yes
 NeedsCompilation: yes
-Packaged: 2016-05-26 15:32:53 UTC; geraci
+Packaged: 2017-02-19 22:53:48 UTC; geraci
 Repository: CRAN
-Date/Publication: 2016-05-26 17:46:23
+Date/Publication: 2017-02-20 08:11:12

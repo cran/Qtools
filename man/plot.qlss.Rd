@@ -10,7 +10,7 @@ This function plots location, scale and shape of a conditional distribution.
 }
 
 \usage{
-\method{plot}{qlss}(x, z, which = 1, interval = FALSE, type = "l", ...)
+\method{plot}{qlss}(x, z, whichp = NULL, interval = FALSE, type = "l", ...)
 }
 
 \arguments{
@@ -20,8 +20,8 @@ an object of class \code{qlss} as returned by \code{\link{qlss.formula}}.
   \item{z}{
 numeric vector of values against which LSS measures are plotted. This argument is required.
 }
-  \item{which}{
-when \code{probs} in \code{qlss} is a vector, the argument \code{which} specifies which element of the vector should be used for plotting.
+  \item{whichp}{
+when \code{probs} in \code{qlss} is a vector, the argument \code{whichp} specifies one of the probabilities (and one only) in \code{probs} that should be used for plotting. If \code{whichp = NULL} (default), the first value in \code{probs} is used.
 }
  \item{interval}{
 logical flag. If \code{TRUE}, confidence intervals for the predictions are plotted.
@@ -51,7 +51,7 @@ Marco Geraci
 trees2 <- trees[order(trees$Height),]
 fit <- qlss(Volume ~ Height, data = trees2, probs = c(.05, .1))
 # Plot the results for probs = 0.1
-plot(fit, z = trees2$Height, which = 2, xlab = "height")
+plot(fit, z = trees2$Height, whichp = 0.1, xlab = "height")
 
 }
 

@@ -11,8 +11,9 @@ This function is used to multiply impute missing values using quantile regressio
 }
 
 \usage{
-mice.impute.rq(y, ry, x, tsf = "none", symm = TRUE,	dbounded = FALSE,
-	lambda = NULL, epsilon = 0.001, method.rq = "fn", ...)
+mice.impute.rq(y, ry, x, tsf = "none", symm = TRUE, dbounded = FALSE,
+	lambda = NULL, x.r = NULL, par = NULL, conditional = TRUE,
+	epsilon = 0.001, method.rq = "fn", ...)
 mice.impute.rrq(y, ry, x, tsf = "none", symm = TRUE, dbounded = FALSE,
 	lambda = NULL, epsilon = 0.001, method.rq = "fn", ...)
 }
@@ -37,8 +38,18 @@ logical flag. If \code{TRUE} (default) a symmetric transformation is used.
 logical flag. If \code{TRUE} the response \code{y} is assumed to be bounded between 0 and 1.
 }
   \item{lambda}{
-a numerical value for the transformation parameter. This is provided by the user or set to zero if not specified.
+if \code{conditional = TRUE}, a numerical value for the transformation parameter. This is provided by the user or set to zero if not specified. If \code{conditional = FALSE}, this argument is ignored.
 }
+  \item{x.r}{
+range of the mapping for doubly bounded variables.
+}
+  \item{par}{
+if \code{conditional = FALSE}, starting values for \code{\link{nlrq1}} can be provided via this argument. See argument \code{start} in \code{nlrq1} for details.
+}
+  \item{conditional}{
+logical flag. If \code{TRUE} (default), the transformation parameter is assumed to be known and this must be provided via the argument \code{lambda}. Otherwise, it is estimated via \code{\link{nlrq1}}.
+}
+
   \item{epsilon}{
 constant used to trim the values of the sample space.
 }

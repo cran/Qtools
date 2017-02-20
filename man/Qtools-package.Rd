@@ -11,8 +11,8 @@ This is a collection of functions for unconditional and conditional quantiles. T
 \tabular{ll}{
 Package: \tab Qtools\cr
 Type: \tab Package\cr
-Version: \tab 1.1\cr
-Date: \tab 2016-05-26\cr
+Version: \tab 1.2\cr
+Date: \tab 2017-02-18\cr
 License: \tab GPL (>=2)\cr
 LazyLoad: \tab yes\cr
 }

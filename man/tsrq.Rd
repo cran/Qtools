@@ -1,6 +1,7 @@
 \name{tsrq}
-\alias{tsrq2}
 \alias{rcrq}
+\alias{nlrq1}
+\alias{tsrq2}
 \alias{nlrq2}
 \alias{tsrq}
 
@@ -20,8 +21,11 @@ tsrq2(formula, data = sys.frame(sys.parent()), dbounded = FALSE, lambda = NULL,
 rcrq(formula, data = sys.frame(sys.parent()), tsf = "mcjI", symm = TRUE,
 	dbounded = FALSE, lambda = NULL, tau = 0.5, subset, weights, na.action,
 	contrasts = NULL, method = "fn")
-nlrq2(formula, data = sys.frame(sys.parent()), par = NULL, dbounded = FALSE,
-	tau = 0.5, subset, weights, na.action, contrasts = NULL)
+nlrq1(formula, data = sys.frame(sys.parent()), tsf = "mcjI", symm = TRUE,
+	dbounded = FALSE, start = NULL, tau = 0.5,
+	subset,	weights, na.action, contrasts = NULL, control = list())
+nlrq2(formula, data = sys.frame(sys.parent()), dbounded = FALSE,
+	start = NULL, tau = 0.5, subset, weights, na.action, contrasts = NULL)
 }
 
 \arguments{
@@ -45,8 +49,11 @@ values of transformation parameters for grid search.
   \item{conditional}{
 logical flag. If \code{TRUE}, the transformation parameter is assumed to be known and this must be provided via the arguments \code{lambda}, \code{delta} in vectors of the same length as \code{tau}.
 }
-  \item{par}{
-vector of length \code{p + 2} of initial values for the parameters to be optimized over. The first \code{p} values are for the regression coefficients while the last 2 are for the transformation parameters \code{lambda} and \code{delta} in \code{\link{mcjII}}. These initial values are passed to \code{\link{optim}}.
+  \item{start}{
+vector of length \code{1 + p} (nlrq1) or \code{2 + p} (nlrq2) of initial values for the parameters to be optimized over. The first one (nlrq1) or two (nlrq2) values for the transformation parameter \code{lambda}, or \code{lambda} and \code{delta}, while the last \code{p} values are for the regression coefficients. These initial values are passed to \code{nl.fit.rqt} or to \code{\link{optim}}.
+}
+  \item{control}{
+list of control parameters of the fitting process (nlrq1). See \code{\link{nlControl}}.
 }
   \item{tau}{
 the quantile(s) to be estimated. See \code{\link{rq}}.
@@ -71,7 +78,7 @@ fitting algorithm for \code{\link{rq}} (default is Frisch-Newton interior point 
 \details{
 These functions implement quantile regression transformation models as discussed by Geraci and Jones (see references). The general model is assumed to be \eqn{Q_{h(Y)|X}(\tau) = \eta = Xb}, where \eqn{Q} denotes the conditional quantile function, \eqn{Y} is the response variable, \eqn{X} a design matrix, and \eqn{h} is a monotone one- or two-parameter transformation. A typical model specified in \code{formula} has the form \code{response ~ terms} where \code{response} is the (numeric) response vector and \code{terms} is a series of terms which specifies a linear predictor for the quantile of the transformed response. The \code{response}, which is singly or doubly bounded, i.e. \code{response > 0} or \code{0 <= response <= 1} respectively, undergoes the transformation specified in \code{tsf}. If the response is bounded in the generic \eqn{[a,b]} interval, the latter is automatically mapped to \eqn{[0,1]} and no further action is required. If, however, the response is singly bounded and contains negative values, it is left to the user to offset the response or the code will produce an error.
 
-The functions \code{tsrq} and \code{tsrq2} use a two-stage (TS) estimator (Fitzenberger et al, 2010) for, respectively, one- and two-parameter transformations. The function \code{rcrq} (one-parameter tranformations) is based on the residual cusum process estimator proposed by Mu and He (2007), while the function \code{nlrq2} (two-parameter tranformations) is based on Nelder-Mead optimization (Geraci and Jones).
+The functions \code{tsrq} and \code{tsrq2} use a two-stage (TS) estimator (Fitzenberger et al, 2010) for, respectively, one- and two-parameter transformations. The function \code{rcrq} (one-parameter tranformations) is based on the residual cusum process estimator proposed by Mu and He (2007). The functions \code{nlrq1} (one-parameter tranformations) and \code{nlrq2} (two-parameter tranformations) are based on, respectively, gradient search and Nelder-Mead optimization.
 }
 
 \value{
@@ -113,7 +120,7 @@ Geraci M and Jones MC. Improved transformation-based quantile regression. Canadi
 
 Jones MC. Connecting distributions with power tails on the real line, the half line and the interval. International Statistical Review 2007;75(1):58-69.
 
-Koenker R (2013). quantreg: Quantile Regression. R package version 5.05. URL \url{http://CRAN.R-project.org/package=quantreg}.
+Koenker R. quantreg: Quantile Regression. 2016. R package version 5.29.
 
 Mu YM, He XM. Power transformation toward a linear regression quantile. Journal of the American Statistical Association 2007;102(477):269-279.
 }
@@ -287,7 +294,7 @@ fit.mcja <- tsrq(y ~ x*treatment, data = new, tsf = "mcjI", symm = FALSE,
 	dbounded = TRUE, tau = taus, lambda = ls)
 fit.mcj2 <- tsrq2(y ~ x*treatment, data = new, dbounded = TRUE, tau = taus,
 	lambda = seq(0,2,by=0.1), delta = seq(0,1.5,by=0.3))
-fit.nlrq <- nlrq2(y ~ x*treatment, data = new, par = coef(fit.mcj2, all = TRUE)[,1],
+fit.nlrq <- nlrq2(y ~ x*treatment, data = new, start = coef(fit.mcj2, all = TRUE)[,1],
 	dbounded = TRUE, tau = taus)
 
 sel <- 0 # placebo (change to sel == 1 for medication group)

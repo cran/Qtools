@@ -45,7 +45,7 @@
   analysis of variance model useful especially for growth curve
   problems'', Biometrika, 51, 313--326.
   
-  Jose Pinheiro, Douglas Bates, Saikat DebRoy, Deepayan Sarkar and the R Development Core Team (2011). nlme: Linear and Nonlinear Mixed Effects Models. R package version 3.1-100. \url{http://CRAN.R-project.org/package=nlme}
+  Jose Pinheiro, Douglas Bates, Saikat DebRoy, Deepayan Sarkar and the R Development Core Team (2011). nlme: Linear and Nonlinear Mixed Effects Models. R package version 3.1-100.
 
 }
 

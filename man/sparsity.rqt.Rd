@@ -49,7 +49,7 @@ This function is based on the code from \code{quantreg::summary.rq} and \code{qu
 
 Geraci M and Jones MC. Improved transformation-based quantile regression. Canadian Journal of Statistics 2015;43(1):118-132.
 
-Koenker R (2013). quantreg: Quantile Regression. R package version 5.05. URL \url{http://CRAN.R-project.org/package=quantreg}.
+Koenker R. quantreg: Quantile Regression. 2016. R package version 5.29.
 
 Koenker R, Bassett G. Regression quantiles. Econometrica. 1978;46(1):33-50.
 
