@@ -1,5 +1,4 @@
-useDynLib(Qtools, .registration=TRUE)
-
+useDynLib("Qtools")
 importFrom("utils", "packageDescription")
 importFrom("grDevices", "grey")
 importFrom("graphics", "abline", "lines", "par", "plot", "points", "segments") 

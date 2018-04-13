@@ -942,6 +942,12 @@ return(mean(out^2))
 
 nlLoss <- function(theta, x, y, tau, tsf, symm = TRUE, dbounded = FALSE, smooth = FALSE, omicron = 0.001) {
 
+if(any(is.na(theta))){
+	ans <- Inf
+	attr(ans, "grad") <- matrix(Inf, ncol(x))
+	return(ans)
+}
+
 n <- length(y)
 eta <- x %*% matrix(theta[-1])
 res <- switch(tsf,
@@ -1428,18 +1434,17 @@ lambdahat <- rep(NA, nq)
 Fitted <- matrix(NA, n, nq)
 
 for(j in 1:nq){
-
 	fit[[j]] <- try(nl.fit.rqt(theta = start, x = x, y = y, tau = tau[j], tsf = tsf, symm = symm, dbounded = dbounded, control = control))
-	
-	if(class(fit[[j]])!="try-error"){
+	if(!inherits(fit[[j]],"try-error")){
 		tmp <- x%*%matrix(fit[[j]]$par[-1])
 		betahat[,j] <- fit[[j]]$par[-1]
 		lambdahat[j] <- fit[[j]]$par[1]
+		if(!is.na(lambdahat[j])){
 		Fitted[,j] <- switch(tsf,
 			mcjI = invmcjI(tmp, lambdahat[j], symm, dbounded),
 			bc = invbc(tmp, lambdahat[j]),
 			ao = invao(tmp, lambdahat[j], symm)
-		)
+		)}
 	}
 }
 
@@ -2762,9 +2767,14 @@ mice.impute.rq <- function (y, ry, x, tsf = "none", symm = TRUE, dbounded = FALS
 
     y.old <- y
 	x <- cbind(1, as.matrix(x))
-    n <- sum(!ry)
+
+	m <- sum(ry)
+	n <- sum(!ry)
     p <- ncol(x)
+	sel <- sample(1:m, m, replace = TRUE)
+	
     xobs <- x[ry, ]
+	xobs <- xobs[sel,]
     xmis <- x[!ry, ]
 	u <- round(runif(n, epsilon, 1 - epsilon) * 1000)
 	u <- ifelse(u %in% c(1:4, 996:999), u/1000, (u - u%%5)/1000)
@@ -2783,6 +2793,7 @@ mice.impute.rq <- function (y, ry, x, tsf = "none", symm = TRUE, dbounded = FALS
         z <- y
 		}
 		yobs <- z[ry]
+		yobs <- yobs[sel]
 		fit <- matrix(NA, p, nt)
 		for (j in 1:nt) {
 			fit[, j] <- as.numeric(rq.fit(xobs, yobs, tau = taus[j], 
@@ -2798,6 +2809,7 @@ mice.impute.rq <- function (y, ry, x, tsf = "none", symm = TRUE, dbounded = FALS
 		} else {val <- ypred}
 	} else {
 		yobs <- y.old[ry]
+		yobs <- yobs[sel]
 		ypred <- matrix(NA, n, nt)
 		fit <- nlrq1(yobs ~ xobs - 1, tsf = tsf, symm = symm, dbounded = dbounded, tau = taus)
 		lambda <- fit$lambda
@@ -2835,16 +2847,22 @@ mice.impute.rrq <- function (y, ry, x, tsf = "none", symm = TRUE, dbounded = FAL
 			)
 	} else {z <- y}
 
+	m <- sum(ry)
 	n <- sum(!ry)
 	p <- ncol(x)
+	sel <- sample(1:m, m, replace = TRUE)
+
+	xobs <- x[ry, ]
+	xobs <- xobs[sel,]
+	xmis <- x[!ry,]
+	yobs <- z[ry]
+	yobs <- yobs[sel]
+
 	u <- round(runif(n, epsilon, 1 - epsilon)*1e3)
 	u <- ifelse(u %in% c(1:4,996:999), u/1e3, (u - u %% 5)/1e3)
 	taus <- unique(u)
 	nt <- length(taus)
 
-	xobs <- x[ry, ]
-	yobs <- z[ry]
-	xmis <- x[!ry,]
 	fit <- matrix(NA, p, nt)
 	for(j in 1:nt){
 		fit[,j] <- as.numeric(rrq.fit(xobs, yobs, tau = taus[j], method = method.rq)$coef)
