@@ -35,7 +35,16 @@
 \alias{normalize}
 \alias{rcTest}
 \alias{KhmaladzeTable}
-\alias{errorHandling}
+
+\alias{C_midrqLoss}
+\alias{C_midrqLoss_bc}
+\alias{C_midrqLoss_ao}
+\alias{C_rcTest}
+\alias{_Qtools_C_midrqLoss}
+\alias{_Qtools_C_midrqLoss_bc}
+\alias{_Qtools_C_midrqLoss_ao}
+\alias{_Qtools_C_rcTest}
+
 
 \description{Internal Qtools objects.}
 \details{These are not to be called by the user.}

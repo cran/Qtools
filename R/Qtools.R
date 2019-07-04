@@ -30,10 +30,10 @@ maref <- function(object, namevec) UseMethod("maref")
 sparsity <- function(object, se = "nid", hs = TRUE) UseMethod("sparsity")
 
 ######################################################################
-### Sample quantiles
+### Mid-distribution
 ######################################################################
 
-# mid-CDF
+# Sample mid-CDF and mid-QF
 
 midecdf <- function(x, na.rm = FALSE){
 
@@ -81,6 +81,498 @@ val$data <- x
 class(val) <- "midquantile"
 return(val)
 }
+
+# Conditional mid-CDF and mid-QF
+
+cmidecdf <- function(formula, data, ecdf_est = "npc", bws = NULL, theta = NULL, subset, weights, na.action){
+
+cl <- match.call()
+mf <- match.call(expand.dots = FALSE)
+m <- match(c("formula", "data", "subset", "weights", "na.action"), names(mf), 0L)
+mf <- mf[c(1L, m)]
+mf$drop.unused.levels <- TRUE
+mf[[1L]] <- quote(stats::model.frame)
+mf <- eval(mf, parent.frame())
+mt <- attr(mf, "terms")
+intercept <- attr(terms.formula(formula), "intercept") == 1
+y <- model.response(mf, "numeric")
+x <- model.matrix(mt, mf, contrasts)
+w <- as.vector(model.weights(mf))
+if (!is.null(w) && !is.numeric(w)) 
+	stop("'weights' must be a numeric vector")
+
+fit <- cmidecdf.fit(x = x, y = y, intercept = intercept, ecdf_est = ecdf_est, bws = bws, theta = theta)
+
+return(fit)
+
+}
+
+cmidecdf.fit <- function(x, y, intercept, ecdf_est, bws = NULL, theta = NULL){
+
+	glm.ao <- function(x, y, theta){
+	k <- length(theta)
+	val <- rep(NA, k)
+		for(i in 1:k){
+			fit <- try(glm.fit(x, y, start = rep(0, ncol(x)), family = binomial(link = ao1(theta[i])))$deviance, silent = TRUE)
+			if(!inherits(fit, "try-error")) val[i] <- fit
+		}
+	sel <- which.min(val)
+	ans <- glm(y ~ x - 1, family = binomial(link = ao1(theta[sel])))
+	ans$lambda <- theta[sel]
+	return(ans)
+	}
+
+p <- ncol(x)
+n <- length(y)
+yo <- sort(unique(y))
+K <- length(yo)
+Z <- mapply(function(t, y) as.numeric(y <= t), yo, MoreArgs = list(y = y))
+if(missing(intercept) & all(x[,1] == 1)) intercept <- TRUE
+
+if(ecdf_est == "npc"){
+	xnpc <- if(intercept) x[, 2:p, drop = FALSE] else x # remove intercept
+	flag <- is.null(bws)
+	bw <- try(npcdistbw(xdat = xnpc, ydat = ordered(y), bandwidth.compute = flag, oykertype = "wangvanryzin", bws = bws), silent = TRUE)
+	if(inherits(bw, "try-error")){
+		ecdf_est <- "logit"
+		warning("ecdf_est 'npc' failed, using 'logit' instead", "\n")
+	} else {
+		Fhat <- mapply(function(obj, x, y, n) npcdist(bws = obj, exdat = x, eydat = ordered(rep(y, n)))$condist, yo, MoreArgs = list(obj = bw, x = xnpc, n = n))
+		Fse <- mapply(function(obj, x, y, n) npcdist(bws = obj, exdat = x, eydat = ordered(rep(y, n)))$conderr, yo, MoreArgs = list(obj = bw, x = xnpc, n = n))
+	}
+}
+
+if(ecdf_est == "ao"){
+	if(is.null(theta)) theta <- seq(0, 2, by = 0.05)
+	fitbin <- apply(Z, 2, function(z, x, theta) suppressWarnings(glm.ao(x = x, y = z, theta = theta)), x = x, theta = theta)
+	Fhat <- sapply(fitbin, predict, type = "response")
+	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+}
+
+if(ecdf_est == "identity"){
+	fitbin <- apply(Z, 2, function(z, x) suppressWarnings(lm(z ~ x - 1)), x = x)
+	Fhat <- sapply(fitbin, predict, type = "response")
+	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+}
+
+if(ecdf_est %in% c("logit", "probit", "cloglog")){
+	fitbin <- apply(Z, 2, function(z, x, link) suppressWarnings(glm(z ~ x - 1, family = binomial(link))), x = x, link = ecdf_est)
+	Fhat <- sapply(fitbin, predict, type = "response")
+	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+}
+
+M <- apply(Fhat, 1, diff)
+if(ncol(Fhat) > 2) M <- t(M)
+G <- Fhat[,-1] - 0.5*M
+G <- cbind(Fhat[,1]/2, G)
+r <- c(max(G[,1]), min(G[,ncol(G)]))
+
+attr(G, "range") <- r
+bw <- if(ecdf_est == "npc") bw else NULL
+
+ans <- list(G = G, Fhat = Fhat, Fse = Fse, yo = yo, bw = bw, ecdf_est = ecdf_est)
+class(ans) <- "cmidecdf"
+
+return(ans)
+
+}
+
+midrqControl <- function(method = "Nelder-Mead", ecdf_est = "npc"){
+
+	list(method = method, ecdf_est = ecdf_est)
+
+}
+
+midrq <- function(formula, data, tau = 0.5, lambda = NULL, subset, weights, na.action, contrasts = NULL, offset, type = 1, midFit = NULL, bws = NULL, control = list()){
+
+cl <- match.call()
+mf <- match.call(expand.dots = FALSE)
+m <- match(c("formula", "data", "subset", "weights", "na.action", 
+	"offset"), names(mf), 0L)
+mf <- mf[c(1L, m)]
+mf$drop.unused.levels <- TRUE
+mf[[1L]] <- quote(stats::model.frame)
+mf <- eval(mf, parent.frame())
+mt <- attr(mf, "terms")
+intercept <- attr(terms.formula(formula), "intercept") == 1
+y <- model.response(mf, "numeric")
+x <- model.matrix(mt, mf, contrasts)
+w <- as.vector(model.weights(mf))
+if (!is.null(w) && !is.numeric(w)) 
+	stop("'weights' must be a numeric vector")
+offset <- as.vector(model.offset(mf))
+if (!is.null(offset)){
+	if (length(offset) != NROW(y)) 
+		stop(gettextf("number of offsets is %d, should equal %d (number of observations)", 
+			length(offset), NROW(y)), domain = NA)
+}
+
+if (is.null(names(control))) 
+	control <- midrqControl()
+else {
+	control_default <- midrqControl()
+	control_names <- intersect(names(control), names(control_default))
+	control_default[control_names] <- control[control_names]
+	control <- control_default
+}
+
+nq <- length(tau)
+n <- nrow(x)
+p <- ncol(x)
+if (is.null(offset)) offset <- rep(0, n)
+#x <- normalize(x) * sqrt(n)
+
+# is the response binary?
+binary <- setequal(sort(unique(y)), c(0,1))
+if(binary){
+	cat("Binary response detected", "\n")
+}
+
+# response on the scale of linear predictor
+if(!is.null(lambda)){
+	if(binary){
+		hy <- ao(y, lambda)
+	} else {
+		if(any(y <= 0)) stop("The response must be strictly positive")
+		hy <- bc(y, lambda)
+	}
+} else {hy <- y}
+
+# fit model
+if(p == 1 & intercept){
+	midFit <- midquantile(y, probs = tau)
+	fit <- list()
+	for (j in 1:nq) {
+		fit[[j]] <- list(par = midFit$y[j])
+	}	
+} else {
+
+	# Estimate mid-CDF if not provided
+	if(is.null(midFit)){
+		midFit <- cmidecdf.fit(x = x, y = y, ecdf_est = control$ecdf_est, theta = seq(0, 2, by = 0.05), bws = bws, intercept = intercept)
+	}
+	if(type == 3){
+		# allowed range for tau
+		r <- attr(midFit$G, "range")
+		if(any(tau < r[1]) | any(tau > r[2])) stop("tau is outside allowed range ", "[", round(r[1], 3), ", " , round(r[2], 3), "]")
+	}
+	fit <- list()
+	for (j in 1:nq) {
+		fit[[j]] <- midrq.fit(x = x, y = y, offset = offset, lambda = lambda, binary = binary, midFit = midFit, type = type, tau = tau[j], method = control$method)
+	}
+
+}
+
+names(fit) <- tau
+betahat <- matrix(sapply(fit, function(x) x$par), nrow = p, ncol = nq)
+rownames(betahat) <- colnames(x)
+colnames(betahat) <- tau
+
+yhat <- x %*% betahat + offset
+if(!is.null(lambda)){
+	if(binary){
+		Fitted <- apply(yhat, 2, invao, lambda = lambda)
+	} else {
+		Fitted <- apply(yhat, 2, invbc, lambda = lambda)
+	}
+} else {
+	Fitted <- yhat
+}
+
+fit$call <- cl
+#fit$mf <- mf
+fit$formula <- formula
+mf <- match.call(expand.dots = FALSE)
+mf <- mf[c(1L, m)]
+mf[[1L]] <- as.name("get_all_vars")
+fit$data <- eval(mf, parent.frame())
+fit$x <- x
+fit$y <- y
+fit$hy <- hy
+fit$weights <- w
+fit$offset <- offset
+fit$tau <- tau
+fit$lambda <- lambda
+fit$binary <- binary
+fit$intercept <- intercept
+fit$type <- type
+fit$control <- control
+fit$coefficients <- betahat
+fit$fitted.values <- Fitted
+fit$residuals <- y - Fitted
+fit$midFit <- midFit
+fit$levels <- .getXlevels(mt, mf)
+fit$terms <- mt
+fit$term.labels <- colnames(x)
+
+class(fit) <- "midrq"
+return(fit)
+}
+
+midrq.fit <- function(x, y, offset, lambda, binary, midFit, type, tau, method){
+
+n <- nrow(x)
+p <- ncol(x)
+
+# transform response to get starting values on the scale of linear predictor
+if(!is.null(lambda)){
+	if(binary){
+		z <- ao(y, lambda) - offset
+	} else {
+		if(any(y <= 0)) stop("The response must be strictly positive")
+		z <- bc(y, lambda) - offset
+	}
+} else {z <- y - offset}
+
+if(type %in% c(1,2)){
+	# starting values for beta
+	b0 <- lm.fit(x, z)$coefficients
+
+	if(p == 1){
+		if(is.null(lambda)){
+			fit <- optim(par = b0, fn = C_midrqLoss, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, n = n, p = p, k = length(midFit$yo), method = "Brent", lower = -Inf, upper = Inf)
+			warning("'type = 3' is more reliable when no-intercept model is fitted")
+		} else {
+			if(binary){
+				fit <- optim(par = b0, fn = C_midrqLoss_ao, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, lambda = lambda, n = n, p = p, k = length(midFit$yo), method = "Brent", lower = -Inf, upper = Inf)
+			} else {
+				fit <- optim(par = b0, fn = C_midrqLoss_bc, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, lambda = lambda, n = n, p = p, k = length(midFit$yo), method = "Brent", lower = -Inf, upper = Inf)
+			}
+		}
+	} else {
+		if(is.null(lambda)){
+			fit <- optim(par = b0, fn = C_midrqLoss, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, n = n, p = p, k = length(midFit$yo), method = method)
+		} else {
+			if(binary){
+				fit <- optim(par = b0, fn = C_midrqLoss_ao, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, lambda = lambda, n = n, p = p, k = length(midFit$yo), method = method)
+			} else {
+				fit <- optim(par = b0, fn = C_midrqLoss_bc, G = midFit$G, x = x, yo = midFit$yo, offset = offset, type = type, tau = tau, lambda = lambda, n = n, p = p, k = length(midFit$yo), method = method)
+			}
+		}
+	fit$pseudoy <- NULL
+	}
+	
+	fit$InitialPar <- b0
+	
+	} else if(type == 3){
+	
+	up <- apply(tau - midFit$G, 1, function(x) which(x < 0)[1])
+	low <- up - 1
+	Z <- cbind(midFit$yo[low], midFit$yo[up])
+	PI <- t(apply(midFit$G, 1, function(x, p){
+		sel <- which(p - x < 0)[1]
+		x[c(sel-1, sel)]
+	}, p = tau))
+	B <- (tau - PI[,1])/(PI[,2] - PI[,1])*(Z[,2] - Z[,1]) + Z[,1]
+	if(!is.null(lambda)){
+		if(binary){
+			B <- ao(B, lambda) - offset
+		} else {
+			B <- bc(B, lambda) - offset
+		}
+	} else {B <- B - offset}
+	
+	fit <- list(par = qr.solve(x, B), pseudoy = B)
+	}
+
+return(fit)
+}
+
+print.midrq <- function(x, ...){
+
+if (!is.null(cl <- x$call)) {
+	cat("call:\n")
+	dput(cl)
+	cat("\n")
+}
+
+coef <- x$coefficients
+cat("\nCoefficients linear predictor:\n")
+print(coef, ...)
+nobs <- length(x$y)
+p <- ncol(x$x)
+rdf <- nobs - p
+cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
+
+}
+
+fitted.midrq <- function(object, ...){
+
+return(object$fitted.values)
+
+}
+
+residuals.midrq <- function(object, ...){
+
+return(object$residuals)
+
+}
+
+predict.midrq <- function(object, newdata, offset, na.action = na.pass, type = "response", ...){
+
+lambda <- object$lambda
+if (!missing(newdata)) {
+	mt <- terms(object)
+	Terms <- delete.response(mt)
+	m <- model.frame(Terms, newdata, na.action = na.action, 
+		xlev = object$levels)
+	if (!is.null(cl <- attr(Terms, "dataClasses"))) 
+		.checkMFClasses(cl, m)
+	object$x <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
+	if (missing(offset)) 
+		object$offset <- rep(0, nrow(object$x))
+	object$data <- newdata
+}
+linpred <- drop(object$x %*% object$coefficients) + object$offset
+if (type == "link") {
+	return(linpred)
+}
+if (type == "response") {
+	if(!is.null(lambda)){
+		Fitted <- apply(linpred, 2, invbc, lambda = lambda)
+	} else {
+		Fitted <- linpred
+	}
+	return(Fitted)
+}
+
+}
+
+coef.midrq <- coefficients.midrq <- function(object, ...){
+
+return(object$coefficients)
+
+}
+
+vcov.midrq <- function(object, ...){
+
+	phi <- function(xnz, Fvec, nonZero, Z, w, n, k, tau, yo, offset, binary, lambda = NULL){
+
+	Fvec[nonZero] <- xnz 
+	Fhat <- matrix(Fvec, n, k)
+	M <- apply(Fhat, 1, diff)
+	if(ncol(Fhat) > 2) M <- t(M)
+	G <- Fhat[,-1] - 0.5*M
+	G <- cbind(Fhat[,1]/2, G)
+		
+	PI <- t(apply(G, 1, function(x, p){
+		sel <- which(p - x < 0)[1]
+		x[c(sel-1, sel)]
+		}, p = tau))
+	B <- (tau - PI[,1])/(PI[,2] - PI[,1])*(Z[,2] - Z[,1]) + Z[,1]
+
+	if(!is.null(lambda)){
+	if(binary){
+		B <- ao(B, lambda) - offset
+	} else {
+		B <- bc(B, lambda) - offset
+	}
+	} else {B <- B - offset}
+
+	ans <- qr.solve(w, B)
+
+	return(ans)
+
+	}
+
+tau <- object$tau
+nq <- length(tau)
+x <- object$x
+n <- length(object$y)
+p <- ncol(x)
+V <- list()
+
+if(object$intercept & p == 1){
+	V <- as.list(attr(confint(object$midFit), "stderr")^2)
+	names(V) <- tau
+	return(V)
+}
+
+xb <- as.matrix(predict(object, type = "link")) # xb includes the offset
+yo <- object$midFit$yo
+K <- length(yo)
+xx <- solve(crossprod(x))
+rate <- if(object$control$ecdf_est == "npc") prod(object$midFit$bw$xbw)*n else 1
+Fvec <- as.vector(object$midFit$Fhat)
+G <- object$midFit$G
+Gvec <- as.vector(G)
+
+# variance of Fhat
+J1 <- object$midFit$Fse^2
+	
+for(j in 1:nq){
+	V1 <- xx %*% t(x) %*% Diagonal(x = (object$hy - xb[,j])^2) %*% x %*% xx
+
+	up <- apply(tau[j] - G, 1, function(x) which(x < 0)[1])
+	low <- up - 1
+	nonZero <- c(which(!is.na(match(Gvec, diag(G[,low])))), which(!is.na(match(Gvec, diag(G[,up])))))
+	
+	J2 <- jacobian(func = phi, x = Fvec[nonZero], Fvec = Fvec, nonZero = nonZero, Z = cbind(yo[low], yo[up]), method = "simple", w = x, n = n, k = K, tau = tau[j], yo = yo, offset = object$offset, binary = object$binary, lambda = object$lambda, method.args = list(eps = 1e-6))
+	V2 <- J2 %*% Diagonal(x = J1[nonZero]) %*% t(J2)
+
+	V[[j]] <- as.matrix(V1 + rate*V2)
+}
+
+names(V) <- tau
+return(V)
+}
+
+summary.midrq <- function(object, alpha = 0.05, ...){
+
+tau <- object$tau
+nq <- length(tau)
+p <- ncol(object$x)
+bhat <- object$coefficients
+
+if(object$intercept & p == 1){
+	tmp <- confint(object$midFit, level = 1 - alpha)
+	SE <- matrix(attr(tmp, "stderr"), nrow = 1)
+	lower <- matrix(tmp$lower, nrow = 1)
+	upper <- matrix(tmp$upper, nrow = 1)
+} else {
+	SE <- sapply(vcov(object), function(x) sqrt(diag(x)))
+	lower <- bhat - SE*qnorm(1 - alpha/2, 0, 1)
+	upper <- bhat + SE*qnorm(1 - alpha/2, 0, 1)
+}
+
+if(nq == 1){
+	tTable <- data.frame(bhat, SE, lower, upper)
+	names(tTable) <- c("Estimate", "Std.Err", "Lower", "Upper")
+} else {
+	tTable <- list()
+	for(i in 1:nq){
+		tTable[[i]] <- data.frame(bhat[,i], SE[,i], lower[,i], upper[,i])
+		dimnames(tTable[[i]]) <- list(object$term.labels, c("Estimate", "Std.Err", "Lower", "Upper"))
+	}
+	names(tTable) <- tau
+}
+
+object$tTable <- tTable
+class(object) <- "summary.midrq"
+
+return(object)
+
+}
+
+print.summary.midrq <- function(x, ...){
+
+if (!is.null(cl <- x$call)) {
+	cat("call:\n")
+	dput(cl)
+	cat("\n")
+}
+
+cat("\nCoefficients linear predictor:\n")
+print(x$tTable, ...)
+nobs <- length(x$y)
+p <- ncol(x$x)
+rdf <- nobs - p
+cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
+
+}
+
+
+# Plot and print functions
 
 plot.midecdf <- function(x, ..., ylab = "p", main = "Ordinary and Mid-ECDF", verticals = FALSE, col.01line = "gray70", col.steps = "gray70", col.midline ="black", cex.points = 1, lty.midline = 2, lwd = 1, jumps = FALSE){
 
@@ -134,13 +626,34 @@ if (!is.null(cl <- x$call)) {
 
 print.midquantile <- function(x, ...){
 
-cat("Empirical mid-ECDF", "\n")
+cat("Empirical mid-quantile function", "\n")
 if (!is.null(cl <- x$call)) {
         cat("Call:\n")
         dput(cl)
         cat("\n")
 }
 
+
+}
+
+print.cmidecdf <- function(x, ...){
+
+ecdf_est <- switch(x$ecdf_est,
+			npc = "Nonparametric (kernel)",
+			ao = "Aranda-Ordaz",
+			logit = "logit",
+			probit = "probit",
+			cloglog = "cloglog",
+			identity = "linear")
+
+cat("Empirical conditional mid-ECDF", "\n")
+cat("Estimator:", ecdf_est)
+cat("\n")
+if (!is.null(cl <- x$call)) {
+        cat("Call:\n")
+        dput(cl)
+        cat("\n")
+}
 
 }
 
@@ -316,6 +829,8 @@ val <- switch(type,
 	rq = qlssPredRq(object = object, newdata = newdata, interval = interval, level = level, R = R, na.action = na.action, trim = trim),
 	rqt = qlssPredRqt(object = object, newdata = newdata, interval = interval, level = level, R = R, na.action = na.action, trim = trim)
 )
+
+val$probs <- object$probs
 
 class(val) <- "qlss"
 return(val)
@@ -507,9 +1022,9 @@ plot.qlss <- function(x, z, whichp = NULL, interval = FALSE, type = "l", ...){
 
 probs <- x$probs
 if(!is.null(whichp)){
-	if(length(whichp) > 1) stop(paste("Only one value for 'whichp' to choose from", probs))
+	if(length(whichp) > 1) stop(cat("Only one value for 'whichp' to choose from", probs, "\n"))
 	sel <- which(whichp == probs)
-	if(!(length(sel))) stop(paste("Choose 'whichp' from", probs))
+	if(!(length(sel))) stop(cat("Choose 'whichp' from", probs, "\n"))
 } else {
 	sel <- 1
 }
@@ -2885,11 +3400,18 @@ mice.impute.rrq <- function (y, ry, x, tsf = "none", symm = TRUE, dbounded = FAL
 
 
 ##################################################
-### QR for counts
+### QR for counts (Machado and Santos Silva)
 ##################################################
 
-rq.counts <- function(formula, data = sys.frame(sys.parent()), tau = 0.5, tsf = "bc", symm = TRUE, dbounded = FALSE, lambda = 0, subset, weights, na.action, contrasts = NULL, offset = NULL, method = "fn", M = 50, zeta = 1e-5, B = 0.999, cn = NULL, alpha = 0.05) 
+rq.counts <- function(formula, data = sys.frame(sys.parent()), tau = 0.5, subset, weights, na.action, contrasts = NULL, offset = NULL, method = "fn", M = 50, zeta = 1e-5, B = 0.999, cn = NULL, alpha = 0.05) 
 {
+
+# log-linear model
+tsf <- "bc"
+symm <- TRUE
+dbounded <- FALSE
+lambda <- 0 
+
 nq <- length(tau)
 if (nq > 1) 
 	stop("One quantile at a time")
@@ -3293,24 +3815,12 @@ for(j in 1:nq){
 	tau <- taus[j]
 	psi <- (Rmat[,j] > 0) * tau + (Rmat[,j] <= 0) * (tau - 1)
 	omega <- replicate(B, sample(c(tau, -tau, 1-tau, tau-1), size = n, replace = TRUE, prob = c((1-tau)/2, (1-tau)/2, tau/2, tau/2)))
-	out <- matrix(0, p, p)
-	outstar <- array(0, dim = c(p, p, B))
 
-	for(i in 1:n){
-		I <- apply(t(x) <= x[i,], 2, function(x) all(x))
-		R <- matrix(colSums(x*I*psi)/sqrt(n))
-		out <- out + tcrossprod(R)
-		
-		S <- apply(x, 1, function(a) tcrossprod(matrix(a)))
-		S <- matrix(colSums(t(S)*I)/n, p, p)
-		for(k in 1:B){
-			Rstar <- matrix(rowSums(t(omega[,k]*I*x) - S%*%t(x*omega[,k]))/sqrt(n))
-			outstar[,,k] <- outstar[,,k] + tcrossprod(Rstar)
-		}	
-	}
-	Tstar <- apply(outstar, 3, function(x, n) eigen(x/n)$values[1], n = n)
+	ans <- C_rcTest(x, psi, omega, n, p, B)
+
+	Tstar <- apply(ans$outstar, 3, function(x, n) eigen(x/n)$values[1], n = n)
 	Tc[j] <- quantile(Tstar, 1 - alpha)
-	Tn[j] <- eigen(out/n)$values[1]
+	Tn[j] <- eigen(ans$out/n)$values[1]
 	pval[j] <- 1 - ecdf(Tstar)(Tn[j])
 }
 
@@ -3349,6 +3859,7 @@ nq <- length(tau)
 if(type == "cusum"){
 	x <- x[[1]]
 	cat(txt[1], "\n")
+	cat("A large test statistic (small p-value) is evidence of lack of fit", "\n")
 	for (j in 1:nq) {
 		cat(paste0("Quantile ", tau[j], ": "))
 		cat(paste0("Test statistic = ", round(x$Tn[j], digits), "; p-value = ", round(x$p.value[j],digits)), "\n")
@@ -3418,353 +3929,4 @@ KhmaladzeTable <- structure(list(p = c(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
 9.929, 10.74, 11.51, 12.28, 13.05, 13.78, 14.54, 15.3, 16.05, 
 16.79)), .Names = c("p", "epsilon", "alpha01", "alpha05", "alpha1"
 ), class = "data.frame", row.names = c(NA, -120L))
-
-
-##################################################
-### Binary quantile regression
-##################################################
-
-rqbinControl <- function(theta = NULL, lower = NULL, upper = NULL, maximise = TRUE, rt = 0.15, tol = 1e-6, ns = 10, nt = 20, neps = 4, maxiter = 1e5, sl = NULL, vm = NULL, seed1 = 1, seed2 = 2, temp = 10, sgn = 1)
-{
-if(seed1 < 0 | seed1 > 31328 | seed2 < 0 | seed2 > 30081)
-    stop(" 'seed1' must be between 0 and 31328 and 'seed2' must be between 0 and 30081.")
-
-if(temp <= 0)
-	stop(" The initial temperature 't' must be > 0.")
-
-list(theta = theta, lower = lower, upper = upper, maximise = maximise, rt = rt, tol = tol, ns = ns, nt = nt, neps = neps, maxiter = maxiter, sl = sl, vm = vm, seed1 = seed1, seed2 = seed2, temp = temp, sgn = sgn)
-
-}
-
-errorHandling <- function (code, type, maxit, tol, fn) 
-{
-    txt <- switch(type, sa = "Simulated annealing")
-    if (code == -1)
-        warning(paste(txt, " did not converge in: ", fn, ". Try increasing max number of iterations ", 
-            "(", maxit, ") or tolerance (", tol, ")\n", sep = ""))
-    if (code == -2) 
-        warning(paste(txt, " did not start in: ", fn, ". Check max number of iterations ", 
-            "(", maxit, ")\n", sep = ""))
-}
-
-rqbin.fit <- function(x, y, tau = 0.5, weights, control)
-{
-x <- as.matrix(x*weights)
-y <- as.vector(y*weights)
-nobs <- nrow(x)
-p <- ncol(x)
-
-if(length(y) != nobs)
-	stop("Number of rows of 'x' does not match length of 'y'")
-
-if(missing(weights))
-		weights <- rep(1, nobs)
-
-if(is.null(control$theta)) {
-	tmp <- glm.fit(x, y, family = binomial(link = "probit"))
-	control$theta <- tmp$coefficients/tmp$coefficients[p]
-}
-
-if(is.null(control$lower)) {
-	control$lower <- c(rep(-10, p-1),1)
-	#control$lower <- c(control$theta[p-1] - 10, 1)
-}
-
-if(is.null(control$upper)) {
-	control$upper <- c(rep(10, p-1),1)
-	#control$upper <- c(control$theta[p-1] + 10, 1)
-}
-
-if(any(control$theta < control$lower) | any(control$theta > control$upper)) stop("The starting values (theta) are out of bounds")
-
-if(is.null(control$sl)){
-	control$sl <- rep(2, p)
-}
-if(is.null(control$vm)){
-	control$vm <- rep(1, p)
-}
-
-fit <- .Fortran("sa",
-         as.double(y),
-         as.double(x),
-         as.integer(nobs),
-         as.integer(p),
-         as.double(control$theta),
-         tau = as.double(tau),
-         as.logical(control$maximise),
-         as.double(control$rt),
-         as.double(control$tol),
-         as.integer(control$ns),
-         as.integer(control$nt),
-         as.integer(control$neps),
-         as.integer(control$maxiter),
-         as.double(control$lower),
-         as.double(control$upper),
-         as.double(control$sl),
-         as.double(control$seed1),
-         as.double(control$seed2),
-         as.double(control$temp),
-         as.double(control$vm),
-         coef = as.double(control$theta),
-         obj = as.double(0),
-         as.integer(0),
-         niter = as.integer(0),
-         as.integer(0),
-         as.integer(0),
-         as.double(control$theta),
-         as.double(control$theta),
-         as.integer(control$theta),
-         converge = as.integer(0),
-		 as.double(control$sgn), PACKAGE = "Qtools"
-         )
-
-errorHandling(fit$converge, "sa", control$max_iter, control$tol, "rq.bin")	 
-		 
-list(coefficients = fit$coef, logLik = fit$obj, opt = fit$niter)
-
-}
-
-rq.bin <- function (formula, tau = 0.5, data, weights = NULL, contrasts = NULL, normalize = "last", control = NULL, fit = TRUE){ 
-
-if (any(tau <= 0) | any(tau >= 1)) 
-	stop("Quantile index out of range")
-nq <- length(tau)
-if(!normalize %in% c("last","all"))
-	stop("'normalize' not recognised")
-	
-Call <- match.call()
-mf <- match.call(expand.dots = FALSE)
-m <- match(c("formula", "data", "subset", "weights", "na.action"), 
-	names(mf), 0L)
-mf <- mf[c(1L, m)]
-mf$drop.unused.levels <- TRUE
-mf[[1L]] <- as.name("model.frame")
-mf <- eval(mf, parent.frame())
-mt <- attr(mf, "terms")
-y <- model.response(mf, "numeric")
-w <- as.vector(model.weights(mf))
-
-if (!is.null(w) && !is.numeric(w)) 
-	stop("'weights' must be a numeric vector")
-if (is.null(w)) 
-	w <- rep(1, length(y))
-
-x <- model.matrix(mt, mf, contrasts)
-term.labels <- colnames(x)
-nobs <- nrow(x)
-p <- ncol(x)
-intercept <- attr(mt, "intercept") == 1
-
-np <- if(intercept) p - 1 else p
-if(np < 2) warning(paste0("There is only one covariate. The coefficient for ", term.labels[2], " is set to 1 for any type of normalization. Results may not be easy to interpret."))
-
-if (is.null(names(control))) 
-	control <- rqbinControl()
-else {
-	control_default <- rqbinControl()
-	control_names <- intersect(names(control), names(control_default))
-	control_default[control_names] <- control[control_names]
-	control <- control_default
-}
-
-if(is.null(control$theta)){
-	tmp <- glm.fit(x, y, family = binomial(link = "probit"))
-	control$theta <- tmp$coefficients/tmp$coefficients[p]
-}
-
-if(is.null(control$lower)) {
-	#control$lower <- c(rep(-10, p-1),1)
-	control$lower <- c(control$theta[1:(p-1)] - 10, 1)
-}
-
-if(is.null(control$upper)) {
-	#control$upper <- c(rep(10, p-1),1)
-	control$upper <- c(control$theta[1:(p-1)] + 10, 1)
-}
-
-if(any(control$theta < control$lower) | any(control$theta > control$upper)) stop("The starting values (theta) are out of bounds")
-
-if(is.null(control$sl))
-	control$sl <- rep(2, p)
-
-if(is.null(control$vm))
-	control$vm <- rep(1, p)
-
-if (!fit) 
-	return(list(x = as.matrix(x), y = y, tau = tau, weights = w, control = control))
-
-if (nq == 1) {
-	fit <- rqbin.fit(x = as.matrix(x), y = y, weights = w, tau = tau, control = control)
-	if (normalize == "all"){
-		theta <- fit$coefficients
-		if(intercept){
-			theta <- c(theta[1], theta[2:p]/sqrt(sum(theta[2:p]^2)))
-		} else {
-			theta <- theta/sqrt(sum(theta^2))
-		}
-		fit$coefficients <- theta
-	}
-}
-else {
-	fit <- vector("list", nq)
-	names(fit) <- format(tau, digits = 4)
-	for (i in 1:nq){
-		fit[[i]] <- rqbin.fit(x = as.matrix(x), y = y, weights = w, tau = tau[i], control = control)
-		if (normalize == "all"){
-			theta <- fit[[i]]$coefficients
-			if(intercept){
-				theta <- c(theta[1], theta[2:p]/sqrt(sum(theta[2:p]^2)))
-			} else {
-				theta <- theta/sqrt(sum(theta^2))
-			}
-		fit[[i]]$coefficients <- theta
-		}
-	}
-}
-
-if (nq > 1) {
-	fit$coefficients <- matrix(NA, p, nq)
-	for (i in 1:nq) {
-		fit$coefficients[, i] <- fit[[i]]$coefficients
-	}
-	rownames(fit$coefficients) <- term.labels
-	colnames(fit$coefficients) <- format(tau, digits = 4)
-}
-class(fit) <- "rq.bin"
-fit$call <- Call
-fit$mf <- mf
-fit$na.action <- attr(mf, "na.action")
-fit$contrasts <- attr(x, "contrasts")
-fit$term.labels <- term.labels
-fit$terms <- mt
-fit$nobs <- nobs
-fit$edf <- if(normalize == "last") p - 1 else p
-fit$rdf <- fit$nobs - fit$edf
-fit$tau <- tau
-fit$x <- as.matrix(x)
-fit$y <- y
-fit$fitted.values <- x %*% fit$coefficients
-fit$weights <- w
-fit$levels <- .getXlevels(mt, mf)
-fit$control <- control
-fit$normalize <- normalize
-return(fit)
-}
-
-print.rq.bin <- function(x, digits = max(6, getOption("digits")), ...){
-
-tau <- x$tau
-nq <- length(tau)
-
-normalize <- switch(x$normalize,
-	last = "last coefficient is set equal to 1",
-	all = "vector of 'slopes' has norm equal to 1")
-
-if(nq == 1){
-	theta <- x$coefficients
-	names(theta) <- x$term.labels
-
-	cat("Call: ")
-	dput(x$call)
-	cat("\nBinary quantile model\n")
-	cat("\nCoefficients of the binary quantile model (", normalize, "):", "\n", sep = "")
-	cat(paste("Quantile", tau, "\n"))
-	print.default(format(theta, digits = digits), print.gap = 2, quote = FALSE)
-
-	cat("\nDegrees of freedom:", x$nobs, "total;", x$rdf, "residual\n")
-	cat(paste("Log-likelihood:", format(x$logLik, digits = digits),"\n"))
-} else {
-	theta <- x$coefficients;
-	rownames(theta) <- x$term.labels;
-	colnames(theta) <- paste("tau = ", format(tau, digits = digits), sep ="")
-
-	cat("Call: ")
-	dput(x$call)
-	cat("\n")
-	cat("Binary quantile model\n")
-	cat("\nCoefficients (", normalize, "):", "\n", sep = "")
-	print.default(format(theta, digits = digits), print.gap = 2, quote = FALSE)
-	cat("\nDegrees of freedom:", x$nobs, "total;", x$rdf, "residual\n")
-}
-
-invisible(x)
-}
-
-coef.rq.bin <- coefficients.rq.bin <- function(object, ...){
-
-tau <- object$tau
-nq <- length(tau)
-ans <- object$coefficients
-
-if(nq == 1){
-  names(ans) <- object$term.labels
-}
-
-return(ans)
-
-}
-
-predict.rq.bin <- function(object, newdata, na.action = na.pass, type = "latent", grid = TRUE, ...) 
-{
-
-tau <- object$tau
-
-if(type == "probability"){
-	if(object$normalize == "all")
-		stop("When 'type' is 'probability', then 'normalize' in main call rq.bin must be 'last'.")
-	if(is.logical(grid)){
-		gtau <- if(grid) seq(0.05, 0.95, by = 0.05) else sort(tau)
-		gobject <- if(grid) update(object, tau = gtau) else object
-	}
-	if(is.numeric(grid)){
-		gtau <- sort(grid)
-		gobject <- update(object, tau = gtau)
-	}
-	if(length(gtau) < 2) stop("Probabilities can be recovered only with > 1 grid points. Either set 'grid = TRUE' or provide an appropriate grid of breakpoints.")
-}
-
-
-if(missing(newdata)){
-	yhat <- drop(object$x %*% object$coefficients)
-	if(type == "probability"){
-		gyhat <- drop(gobject$x %*% gobject$coefficients)
-	}
-}
-else {
-	objt <- terms(object)
-	Terms <- delete.response(objt)
-	m <- model.frame(Terms, newdata, na.action = na.action, xlev = object$levels)
-	if (!is.null(cl <- attr(Terms, "dataClasses"))) .checkMFClasses(cl, m)
-	x <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
-	yhat <- drop(x %*% object$coefficients)
-	if(type == "probability"){
-		gyhat <- drop(x %*% gobject$coefficients)
-	}
-	
-}
-
-
-if(type == "probability"){
-	sgn <- gyhat >= 0
-	sgn <- t(apply(sgn, 1, cumsum))
-	sel <- apply(sgn, 1, function(x) which(x == 1)[1])
-	up <- 1 - c(0, gtau)[sel]
-	low <- 1 - gtau[sel]
-	phat <- cbind(low, up)
-	phat[is.na(sel),1] <- c(0)
-	phat[is.na(sel),2] <- c(gtau[1])
-	colnames(phat) <- c("lower", "upper")
-}
-
-ans <- if(type == "probability") phat else if(type == "latent") yhat else NULL
-
-return(ans)
-}
-
-fitted.rq.bin <- function(object, ...){
-
-return(object$fitted.values)
-
-}
-
 

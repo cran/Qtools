@@ -1,23 +1,23 @@
-\name{coef.rq.bin}
-\alias{coefficients.rq.bin}
-\alias{coef.rq.bin}
+\name{coef.midrq}
+\alias{coefficients.midrq}
+\alias{coef.midrq}
 
 \title{
 Extract Coefficients
 }
 
 \description{
-\code{coef} extracts model coefficients from \code{rq.bin} objects.
+\code{coef} extracts model coefficients from \code{midrq} objects.
 }
 
 \usage{
-\method{coef}{rq.bin}(object, ...)
-\method{coefficients}{rq.bin}(object, ...)
+\method{coef}{midrq}(object, ...)
+\method{coefficients}{midrq}(object, ...)
 }
 
 \arguments{
   \item{object}{
-an \code{rq.bin} object.
+an \code{midrq} object.
 }
   \item{\dots}{
 not used.
@@ -33,7 +33,7 @@ Marco Geraci
 }
 
 \seealso{
-\code{\link{rq.bin}}
+\code{\link{midrq}}
 }
 
 \keyword{coefficients}

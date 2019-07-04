@@ -4,13 +4,12 @@
 \title{
 Quantile Regression for Counts}
 \description{
-This function is used to fit a quantile regression model when the response is a count variable.
+This function is used to fit a (log-linear) quantile regression model when the response is a count variable.
 }
 \usage{
-rq.counts(formula, data = sys.frame(sys.parent()), tau = 0.5, tsf = "bc", symm = TRUE,
-	dbounded = FALSE, lambda = 0, subset, weights, na.action, contrasts = NULL,
-	offset = NULL, method = "fn", M = 50, zeta = 1e-5, B = 0.999, cn = NULL,
-	alpha = 0.05)
+rq.counts(formula, data = sys.frame(sys.parent()), tau = 0.5, subset, weights,
+	na.action, contrasts = NULL, offset = NULL, method = "fn", M = 50,
+	zeta = 1e-5, B = 0.999, cn = NULL, alpha = 0.05)
 }
 
 \arguments{
@@ -22,18 +21,6 @@ an optional data frame, list or environment (or object coercible by as.data.fram
 }
   \item{tau}{
 quantile to be estimated.
-}
-  \item{tsf}{
-transformation to be used. Possible options are \code{mcjI} for Proposal I and \code{bc} for Box-Cox. The latter is the default, with \code{lambda = 0}, i.e. the logarithmic transformation.
-}
-  \item{symm}{
-logical flag. If \code{TRUE} and \code{tsf = 'mcj'}, the symmetric Proposal I transformation is used.
-}
-  \item{dbounded}{
-logical flag. If \code{TRUE} the response is assumed to be doubly bounded on [a,b]. If \code{FALSE} (default) the response is assumed to be singly bounded (ie, strictly positive).
-}
-  \item{lambda}{
-a numerical value for the transformation parameter. This is provided by the user or set to zero if not specified.
 }
   \item{subset}{
 an optional vector specifying a subset of observations to be used in the fitting process.
@@ -73,7 +60,10 @@ significance level.
 
 }
 
-\details{A linear quantile regression model is fitted to the log--transformed response. The transformation of the response can be changed with arguments \code{tsf}, \code{symm}, \code{dbounded}, \code{lambda} (see \code{\link{bc}}). The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2016). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.} 
+\details{A linear quantile regression model is fitted to the log--transformed response. The notation used here follows closely that of Machado and Santos Silva (2005). This function is based on routines from package \code{quantreg} (Koenker, 2016). See also \code{lqm.counts} from package \code{lqmm} (Geraci, 2014) for Laplace gradient estimation.
+
+As of version 1.4, the transformation of the response cannot be changed. This option may be reinstated in future versions.
+} 
 
 \value{
 a list of class \code{rq.counts} containing the following components

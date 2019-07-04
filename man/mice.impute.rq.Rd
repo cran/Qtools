@@ -62,8 +62,7 @@ additional arguments.
 }
 
 \details{
-This function implements the methods proposed by Geraci (2013) to impute missing values using quantile regression models. Uniform values are sampled from \emph{[epsilon, 1 - epsilon]}, therefore allowing the interval to be bounded away from 0 and 1 (default is 0.001). It is possible to specify a quantile regression transformation model with parameter \code{lambda} (Geraci and Jones). The function \code{mice.impute.rrq} performs imputation based on restricted
-regression quantiles to avoid quantile crossing (see Geraci 2013 for details).
+This function implements the methods proposed by Geraci (2016) and Geraci and McLain (2018) to impute missing values using quantile regression models. Uniform values are sampled from \emph{[epsilon, 1 - epsilon]}, therefore allowing the interval to be bounded away from 0 and 1 (default is 0.001). It is possible to specify a quantile regression transformation model with parameter \code{lambda} (Geraci and Jones). The function \code{mice.impute.rrq} performs imputation based on restricted regression quantiles to avoid quantile crossing (see Geraci 2016 for details).
 }
 
 \value{
@@ -73,15 +72,15 @@ A vector of length \code{nmis} with imputations.
 }
 
 \references{
-Bottai M, Zhen H. Multiple imputation based on conditional quantile estimation. Epidemiology, Biostatistics and Public Health 2013;10(1):e8758-1.
+Bottai, M., & Zhen, H. (2013). Multiple imputation based on conditional quantile estimation. Epidemiology, Biostatistics, and Public Health, 10(1), e8758.
 
-Geraci M. Estimation of regression quantiles in complex surveys with data missing at random: An application to birthweight determinants. Statistical Methods in Medical Research 2013.
-doi:10.1177/0962280213484401
+Geraci, M. (2016). Estimation of regression quantiles in complex surveys with data missing at random: An application to birthweight determinants. Statistical Methods in Medical Research, 25(4), 1393-1421.
 
-Geraci M and Jones MC. Improved transformation-based quantile regression. Canadian Journal of Statistics 2015;43(1):118-132.
+Geraci, M., and Jones, M. C. (2015). Improved transformation-based quantile regression. Canadian Journal of Statistics, 43(1), 118-132.
 
-van Buuren S and Groothuis-Oudshoorn K (2011). mice: Multivariate Imputation by Chained Equations in R. Journal of Statistical Software, 45(3), 1-67. URL http://www.jstatsoft.org/v45/i03/.
+Geraci, M., and McLain, A. (2018). Multiple imputation for bounded variables. Psychometrika, 83(4), 919-940.
 
+van Buuren, S., and Groothuis-Oudshoorn, K. (2011). mice: Multivariate imputation by chained equations in R. Journal of Statistical Software, 45(3), 1--67. 
 }
 \author{
 Marco Geraci
