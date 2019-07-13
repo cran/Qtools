@@ -2,6 +2,7 @@
 #include <RcppArmadillo.h>
 #include <cmath>
 
+using std::sqrt;
 using namespace Rcpp;
 
 // [[Rcpp::export]]
@@ -254,7 +255,7 @@ List C_rcTest(NumericMatrix x, NumericVector psi, NumericMatrix omega, int n, in
 
 		for(int k = 0; k < p; ++k){
 			for(int j = 0; j < n; ++j){
-				Rn[k] += x(j,k)*(Ix[j] == p)*psi[j]/sqrt(n);
+				Rn[k] += x(j,k)*(Ix[j] == p)*psi[j]/sqrt(static_cast<double>(n));
 			}
 		}	
 
@@ -290,7 +291,7 @@ List C_rcTest(NumericMatrix x, NumericVector psi, NumericMatrix omega, int n, in
 			
 			for(int h = 0; h < p; ++h){
 				for(int j = 0; j < n; ++j){
-					Rstar(h) += (omega(j,k)*(Ix[j] == p)*x(j,h) - Sx(h,j))/sqrt(n);
+					Rstar(h) += (omega(j,k)*(Ix[j] == p)*x(j,h) - Sx(h,j))/sqrt(static_cast<double>(n));
 				}
 			}
 			

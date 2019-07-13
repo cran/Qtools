@@ -1,7 +1,7 @@
 fe06497acaf4f45999925d348c2605f9 *COPYING
-a5b894ee6bdcb4f6c58a03a64f45d54f *DESCRIPTION
+44f85d68d80dd18ce3926078502e4f43 *DESCRIPTION
 b844d1b4c24fe37e787a83b826812571 *NAMESPACE
-5e47fe30eed94ec12380281626ec2dd6 *NEWS
+0837a3d0b3edfd2a7c6eac37ee254e74 *NEWS
 6ffda5f3dc0f6129e8f9640fcae99769 *R/Qtools.R
 b5626f959485d3b7ec01993cb3cdfb15 *R/RcppExports.R
 b9ac8661996afa27567a67123a75de95 *build/vignette.rds
@@ -11,14 +11,14 @@ dfb988e33aac10f31d1045ebad9f59a7 *data/Orthodont.rda
 881c8ca691cb6647cc01d9ba3fbccadb *data/labor.rda
 9c8bcf95bbc8b0f46d89a28adf23091d *inst/CITATION
 9ae6055998561bde22643d57885270c8 *inst/doc/Qtools.R
-3f2aadcbd9a01a26049bc2cbfa354a39 *inst/doc/Qtools.Rmd
+c915e36461edf1cc6fe8110601453ac3 *inst/doc/Qtools.Rmd
 80b11ff1f94c66fd2e9f10f871a31b29 *inst/doc/Qtools.html
 0916eed82b271dfcb9648ab58911b607 *man/Chemistry.Rd
 84e2fbe6856cd922e38949dad6eb41c3 *man/GOFTest.Rd
 4c4c39236ff6eadcd500130b2b7fc9ab *man/KhmaladzeFormat.Rd
 33a2e4ab9d2222e79559bb722b23d2a8 *man/Orthodont.Rd
 40ad682386d44735e64be9f770fdb932 *man/Qtools-internal.Rd
-6a39b4bf8d6204cf2a5cf9d2d1a7a029 *man/Qtools-package.Rd
+ab721f9710539999d13d3fc9a2b8d436 *man/Qtools-package.Rd
 f520f4b5f5a2057e7a865fd2eb6c7ebe *man/ao.Rd
 c96e14c01682aa01063b0cbd90656461 *man/cmidecdf.Rd
 f6d9dba5ea03006fbb27312a07a4abe9 *man/coef.midrq.Rd
@@ -63,7 +63,7 @@ dd883a5998dd592d4e7e875cb72f2167 *man/summary.midrq.Rd
 871e332f0d387e7619b9efd590ae4b47 *man/summary.rrq.Rd
 25b5b174ea7bdee5c807718099a55a2a *man/tsrq.Rd
 b7b75cec1d9fe20934f02343fc5d4ffc *man/vcov.midrq.Rd
-9935bea9dbd36b62e638110248c74ac6 *src/Qtools.cpp
+23c1fbac5d42cad0f53e457291659c40 *src/Qtools.cpp
 29ff76c9bf2be04e8e7d2c4ab21c161c *src/RcppExports.cpp
-3f2aadcbd9a01a26049bc2cbfa354a39 *vignettes/Qtools.Rmd
+c915e36461edf1cc6fe8110601453ac3 *vignettes/Qtools.Rmd
 7f0ed6eff17821727d34eb14d9685862 *vignettes/Qtools.bib
