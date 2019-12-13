@@ -1,8 +1,8 @@
 Package: Qtools
 Type: Package
 Title: Utilities for Quantiles
-Version: 1.4.1
-Date: 2019-07-13
+Version: 1.5.1
+Date: 2019-12-13
 Authors@R: c(
 	person(given="Marco", family="Geraci", role=c("aut", "cph", "cre"), email="geraci@mailbox.sc.edu", comment = c(ORCID = "0000-0002-6311-8685")),
 	person(given="Alessio", family="Farcomeni", role=c("ctb"), email="alessio.farcomeni@uniroma1.it", comment = "Contributions to midrq code"))
@@ -22,8 +22,8 @@ Description: Functions for unconditional and conditional quantiles. These
 License: GPL (>= 2)
 LazyLoad: yes
 NeedsCompilation: yes
-Packaged: 2019-07-13 15:16:36 UTC; geraci
+Packaged: 2019-12-13 17:51:14 UTC; geraci
 Author: Marco Geraci [aut, cph, cre] (<https://orcid.org/0000-0002-6311-8685>),
   Alessio Farcomeni [ctb] (Contributions to midrq code)
 Repository: CRAN
-Date/Publication: 2019-07-13 16:20:03 UTC
+Date/Publication: 2019-12-13 18:20:02 UTC

@@ -84,7 +84,7 @@ return(val)
 
 # Conditional mid-CDF and mid-QF
 
-cmidecdf <- function(formula, data, ecdf_est = "npc", bws = NULL, theta = NULL, subset, weights, na.action){
+cmidecdf <- function(formula, data, ecdf_est = "npc", bws = NULL, theta = NULL, subset, weights, na.action, contrasts = NULL){
 
 cl <- match.call()
 mf <- match.call(expand.dots = FALSE)
@@ -183,7 +183,7 @@ midrqControl <- function(method = "Nelder-Mead", ecdf_est = "npc"){
 
 }
 
-midrq <- function(formula, data, tau = 0.5, lambda = NULL, subset, weights, na.action, contrasts = NULL, offset, type = 1, midFit = NULL, bws = NULL, control = list()){
+midrq <- function(formula, data, tau = 0.5, lambda = NULL, subset, weights, na.action, contrasts = NULL, offset, type = 1, midFit = NULL, control = list()){
 
 cl <- match.call()
 mf <- match.call(expand.dots = FALSE)
@@ -249,8 +249,8 @@ if(p == 1 & intercept){
 
 	# Estimate mid-CDF if not provided
 	if(is.null(midFit)){
-		midFit <- cmidecdf.fit(x = x, y = y, ecdf_est = control$ecdf_est, theta = seq(0, 2, by = 0.05), bws = bws, intercept = intercept)
-	}
+		midFit <- cmidecdf.fit(x = x, y = y, ecdf_est = control$ecdf_est, theta = seq(0, 2, by = 0.05), bws = control$bws, intercept = intercept)
+	} else {control$ecdf_est <- midFit$ecdf_est}
 	if(type == 3){
 		# allowed range for tau
 		r <- attr(midFit$G, "range")
@@ -378,24 +378,6 @@ if(type %in% c(1,2)){
 return(fit)
 }
 
-print.midrq <- function(x, ...){
-
-if (!is.null(cl <- x$call)) {
-	cat("call:\n")
-	dput(cl)
-	cat("\n")
-}
-
-coef <- x$coefficients
-cat("\nCoefficients linear predictor:\n")
-print(coef, ...)
-nobs <- length(x$y)
-p <- ncol(x$x)
-rdf <- nobs - p
-cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
-
-}
-
 fitted.midrq <- function(object, ...){
 
 return(object$fitted.values)
@@ -444,35 +426,41 @@ return(object$coefficients)
 
 }
 
-vcov.midrq <- function(object, ...){
+vcov.midrq <- function(object, numerical = FALSE, robust = FALSE, ...){
 
 	phi <- function(xnz, Fvec, nonZero, Z, w, n, k, tau, yo, offset, binary, lambda = NULL){
+		Fvec[nonZero] <- xnz 
+		Fhat <- matrix(Fvec, n, k)
+		M <- apply(Fhat, 1, diff)
+		if(ncol(Fhat) > 2) M <- t(M)
+		G <- Fhat[,-1] - 0.5*M
+		G <- cbind(Fhat[,1]/2, G)
+			
+		PI <- t(apply(G, 1, function(x, p){
+			sel <- which(p - x < 0)[1]
+			x[c(sel-1, sel)]
+			}, p = tau))
+		B <- (tau - PI[,1])/(PI[,2] - PI[,1])*(Z[,2] - Z[,1]) + Z[,1]
 
-	Fvec[nonZero] <- xnz 
-	Fhat <- matrix(Fvec, n, k)
-	M <- apply(Fhat, 1, diff)
-	if(ncol(Fhat) > 2) M <- t(M)
-	G <- Fhat[,-1] - 0.5*M
-	G <- cbind(Fhat[,1]/2, G)
-		
-	PI <- t(apply(G, 1, function(x, p){
-		sel <- which(p - x < 0)[1]
-		x[c(sel-1, sel)]
-		}, p = tau))
-	B <- (tau - PI[,1])/(PI[,2] - PI[,1])*(Z[,2] - Z[,1]) + Z[,1]
+		if(!is.null(lambda)){
+		if(binary){
+			B <- ao(B, lambda) - offset
+		} else {
+			B <- bc(B, lambda) - offset
+		}
+		} else {B <- B - offset}
 
-	if(!is.null(lambda)){
-	if(binary){
-		B <- ao(B, lambda) - offset
-	} else {
-		B <- bc(B, lambda) - offset
+		ans <- qr.solve(w, B)
+		return(ans)
 	}
-	} else {B <- B - offset}
-
-	ans <- qr.solve(w, B)
-
-	return(ans)
-
+	
+	huber <- function(x, a = 1.645){
+		ifelse(abs(x) <= a, 0.5*x^2, a*(abs(x) - 0.5*a))
+	}
+	
+	f <- function(b, args) {
+		args$b <- b
+		do.call(C_midrqLoss, args = args)
 	}
 
 tau <- object$tau
@@ -480,7 +468,10 @@ nq <- length(tau)
 x <- object$x
 n <- length(object$y)
 p <- ncol(x)
-V <- list()
+G <- object$midFit$G
+Gvec <- as.vector(G)
+yo <- object$midFit$yo
+K <- length(yo)
 
 if(object$intercept & p == 1){
 	V <- as.list(attr(confint(object$midFit), "stderr")^2)
@@ -488,36 +479,48 @@ if(object$intercept & p == 1){
 	return(V)
 }
 
-xb <- as.matrix(predict(object, type = "link")) # xb includes the offset
-yo <- object$midFit$yo
-K <- length(yo)
-xx <- solve(crossprod(x))
-rate <- if(object$control$ecdf_est == "npc") prod(object$midFit$bw$xbw)*n else 1
-Fvec <- as.vector(object$midFit$Fhat)
-G <- object$midFit$G
-Gvec <- as.vector(G)
+if(numerical){
+	FIT_ARGS <- list(G = G, x = x, yo = yo, offset = object$offset, type = object$type, n = n, p = p, k = K)
 
-# variance of Fhat
-J1 <- object$midFit$Fse^2
-	
-for(j in 1:nq){
-	V1 <- xx %*% t(x) %*% Diagonal(x = (object$hy - xb[,j])^2) %*% x %*% xx
+	V <- list()
+	for(j in 1:nq){
+		FIT_ARGS$tau <- tau[j]
+		H <- hessian(func = f, x = object$coefficients[,j], method = "Richardson", args = FIT_ARGS)
+		ans <- MASS::ginv(H)
+		V[[j]] <- ans/n
+	}
+} else {
+	xb <- as.matrix(predict(object, type = "link")) # xb includes the offset
+	xx <- solve(crossprod(x))
+	rate <- if(object$midFit$ecdf_est == "npc") prod(object$midFit$bw$xbw)*n else 1
+	Fvec <- as.vector(object$midFit$Fhat)
+	r <- attr(G, "range")
 
-	up <- apply(tau[j] - G, 1, function(x) which(x < 0)[1])
-	low <- up - 1
-	nonZero <- c(which(!is.na(match(Gvec, diag(G[,low])))), which(!is.na(match(Gvec, diag(G[,up])))))
-	
-	J2 <- jacobian(func = phi, x = Fvec[nonZero], Fvec = Fvec, nonZero = nonZero, Z = cbind(yo[low], yo[up]), method = "simple", w = x, n = n, k = K, tau = tau[j], yo = yo, offset = object$offset, binary = object$binary, lambda = object$lambda, method.args = list(eps = 1e-6))
-	V2 <- J2 %*% Diagonal(x = J1[nonZero]) %*% t(J2)
+	# variance of Fhat
+	J1 <- object$midFit$Fse^2
 
-	V[[j]] <- as.matrix(V1 + rate*V2)
+	V <- list()
+	for(j in 1:nq){
+		res <- if(robust) huber(object$hy - xb[,j]) else (object$hy - xb[,j])^2
+		V1 <- xx %*% t(x) %*% Diagonal(x = res) %*% x %*% xx
+
+		up <- apply(tau[j] - G, 1, function(x) which(x < 0)[1])
+		low <- up - 1
+		if(any(low == 0)) stop("Something went wrong. Perhaps tau is outside allowed range ", "[", round(r[1], 3), ", " , round(r[2], 3), "]")
+		nonZero <- c((low - 1)*n + 1:n, (up - 1)*n + 1:n)
+		
+		J2 <- jacobian(func = phi, x = Fvec[nonZero], Fvec = Fvec, nonZero = nonZero, Z = cbind(yo[low], yo[up]), method = "simple", w = x, n = n, k = K, tau = tau[j], yo = yo, offset = object$offset, binary = object$binary, lambda = object$lambda, method.args = list(eps = 1e-6))
+		V2 <- J2 %*% Diagonal(x = J1[nonZero]) %*% t(J2)
+
+		V[[j]] <- as.matrix(V1 + rate*V2)
+	}
 }
 
 names(V) <- tau
 return(V)
 }
 
-summary.midrq <- function(object, alpha = 0.05, ...){
+summary.midrq <- function(object, alpha = 0.05, numerical = FALSE, robust = FALSE, ...){
 
 tau <- object$tau
 nq <- length(tau)
@@ -530,7 +533,7 @@ if(object$intercept & p == 1){
 	lower <- matrix(tmp$lower, nrow = 1)
 	upper <- matrix(tmp$upper, nrow = 1)
 } else {
-	SE <- sapply(vcov(object), function(x) sqrt(diag(x)))
+	SE <- sapply(vcov(object, numerical = numerical, robust = robust), function(x) sqrt(diag(x)))
 	lower <- bhat - SE*qnorm(1 - alpha/2, 0, 1)
 	upper <- bhat + SE*qnorm(1 - alpha/2, 0, 1)
 }
@@ -553,24 +556,6 @@ class(object) <- "summary.midrq"
 return(object)
 
 }
-
-print.summary.midrq <- function(x, ...){
-
-if (!is.null(cl <- x$call)) {
-	cat("call:\n")
-	dput(cl)
-	cat("\n")
-}
-
-cat("\nCoefficients linear predictor:\n")
-print(x$tTable, ...)
-nobs <- length(x$y)
-p <- ncol(x$x)
-rdf <- nobs - p
-cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
-
-}
-
 
 # Plot and print functions
 
@@ -654,6 +639,41 @@ if (!is.null(cl <- x$call)) {
         dput(cl)
         cat("\n")
 }
+
+}
+
+print.midrq <- function(x, ...){
+
+if (!is.null(cl <- x$call)) {
+	cat("call:\n")
+	dput(cl)
+	cat("\n")
+}
+
+coef <- x$coefficients
+cat("\nCoefficients linear predictor:\n")
+print(coef, ...)
+nobs <- length(x$y)
+p <- ncol(x$x)
+rdf <- nobs - p
+cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
+
+}
+
+print.summary.midrq <- function(x, ...){
+
+if (!is.null(cl <- x$call)) {
+	cat("call:\n")
+	dput(cl)
+	cat("\n")
+}
+
+cat("\nCoefficients linear predictor:\n")
+print(x$tTable, ...)
+nobs <- length(x$y)
+p <- ncol(x$x)
+rdf <- nobs - p
+cat("\nDegrees of freedom:", nobs, "total;", rdf, "residual\n")
 
 }
 
@@ -1442,7 +1462,7 @@ Rfun <- function(x, t, e) mean(apply(x, 1, function(xj,t) all(xj <= t), t = t) *
 
 fit <- try(rq.wfit(x, z, tau = tau, weights = weights, method = method.rq), silent = T)
 
-if(class(fit)!="try-error"){
+if(!inherits(fit, "try-error")){
 	e <- as.numeric(fit$residuals <= 0)
 	#out <- apply(x, 1, function(t, z, e) Rfun(z, t, e), z = x, e = tau - e)
 	for(i in 1:n){
@@ -1572,7 +1592,7 @@ if(!conditional){
 	# estimate linear QR for different taus
 		for(j in 1:nq){
 			fit <- try(do.call(rq.wfit, args = list(x = x, y = newresponse, tau = tau[j], weights = w, method = method)), silent = TRUE)
-			if(class(fit)!="try-error"){
+			if(!inherits(fit, "try-error")){
 			zhat[,j,i] <- drop(x %*% fit$coefficients)
 			
 			Fitted <- switch(tsf,
@@ -2050,7 +2070,7 @@ if(!conditional){
 			for(j in 1:nq){
 			fit <- try(do.call(rq.wfit, args = list(x = x, y = newresponse, tau = tau[j], weights = w, method = method)), silent = TRUE)
 				
-				if(class(fit)!="try-error"){
+				if(!inherits(fit, "try-error")){
 				Fitted <- invmcjII(drop(x %*% fit$coefficients), lambda[i], delta[k], dbounded)
 				matLoss[i,k,j] <- l1Loss(y - Fitted, tau = tau[j], weights = w)
 				}
@@ -2185,7 +2205,7 @@ Fitted <- matrix(NA, n, nq)
 for(j in 1:nq){
 	fit[[j]] <- try(optim(par = start, fn = f, method = "Nelder-Mead", dataLs = list(x = x, y = y, dbounded = dbounded, tau = tau[j], weights = w)), silent = T)
 
-	if(class(fit[[j]])!="try-error"){
+	if(!inherits(fit[[j]], "try-error")){
 		betahat[,j] <- fit[[j]]$par[-c(1:2)]
 		parhat[,j] <- c(fit[[j]]$par[1], fit[[j]]$par[2])
 		Fitted[,j] <- invmcjII(x %*% matrix(betahat[,j]), parhat[1,j], parhat[2,j], dbounded)
@@ -2333,7 +2353,7 @@ if(type == "maref"){
 
 terms2expr <- function(object){
 
-if(!"terms" %in% class(object)) stop("Only objects of class 'terms'")
+if(!inherits(object, "terms")) stop("Only objects of class 'terms'")
 
 Irm <- function(x){
 	n <- nchar(x)
@@ -2605,7 +2625,7 @@ return(object$y - object$fitted.values)
 
 coef.rqt <- coefficients.rqt <- function(object, all = FALSE, ...){
 
-if(!class(object) %in% c("rqt")) stop("Class 'rqt' only")
+if(!inherits(object, "rqt")) stop("Class 'rqt' only")
 
 tau <- object$tau
 nq <- length(tau)
@@ -2845,8 +2865,8 @@ for(j in 1:nq){
 	d <- cbind(x,d2)
 	H <- A %*% (t(f0*d) %*% d2)/n
 	Hinv <- try(chol2inv(chol(H)), silent = TRUE)
-	if(class(Hinv) == "try-error") Hinv <- try(solve(H), silent = TRUE)
-	if(class(Hinv) == "try-error"){
+	if(inherits(Hinv, "try-error")) Hinv <- try(solve(H), silent = TRUE)
+	if(inherits(Hinv, "try-error")){
 		Hinv <- matrix(NA, p + 1, p + 1)
 		warning("Singular 'H' matrix")
 	}
@@ -3514,7 +3534,7 @@ sel <- rep(TRUE, M)
 for (i in 1:M) {
 	tmpInv <- try(solve(t(x * multiplier[, i]) %*% x/n), 
 		silent = TRUE)
-	if (class(tmpInv) != "try-error") 
+	if (!inherits(tmpInv, "try-error"))
 		{d[, , i] <- tmpInv}
 	else {sel[i] <- FALSE}
 }
@@ -3738,7 +3758,7 @@ addnoise <- function(x, centered = TRUE, B = 0.999)
 
 KhmaladzeFormat <- function(object, epsilon){
 
-if(class(object) != "KhmaladzeTest") stop("class(object) must be 'KhmaladzeTest'")
+if(!inherits(object, "KhmaladzeTest")) stop("class(object) must be 'KhmaladzeTest'")
 tt <- get("KhmaladzeTable")
 if(!(epsilon %in% unique(tt$epsilon))) stop("'epsilon' must be in c(0.05,0.10,0.15,0.20,0.25,0.30)")
 
