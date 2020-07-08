@@ -45,7 +45,6 @@
 \alias{_Qtools_C_midrqLoss_ao}
 \alias{_Qtools_C_rcTest}
 
-
 \description{Internal Qtools objects.}
 \details{These are not to be called by the user.}
 \keyword{internal}

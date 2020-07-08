@@ -1,4 +1,4 @@
-## ---- echo=FALSE, warning = FALSE---------------------------------------------
+## ---- echo=FALSE, warning = FALSE----------------------------------------
 library(knitr)
 #Determine the output format of the document
 outputFormat   = opts_knit$get("rmarkdown.pandoc.to")

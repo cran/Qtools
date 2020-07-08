@@ -84,7 +84,7 @@ return(val)
 
 # Conditional mid-CDF and mid-QF
 
-cmidecdf <- function(formula, data, ecdf_est = "npc", bws = NULL, theta = NULL, subset, weights, na.action, contrasts = NULL){
+cmidecdf <- function(formula, data, ecdf_est = "npc", npc_args = list(), theta = NULL, subset, weights, na.action, contrasts = NULL){
 
 cl <- match.call()
 mf <- match.call(expand.dots = FALSE)
@@ -94,20 +94,20 @@ mf$drop.unused.levels <- TRUE
 mf[[1L]] <- quote(stats::model.frame)
 mf <- eval(mf, parent.frame())
 mt <- attr(mf, "terms")
-intercept <- attr(terms.formula(formula), "intercept") == 1
+intercept <- attr(terms.formula(formula, data = mf), "intercept") == 1
 y <- model.response(mf, "numeric")
 x <- model.matrix(mt, mf, contrasts)
 w <- as.vector(model.weights(mf))
 if (!is.null(w) && !is.numeric(w)) 
 	stop("'weights' must be a numeric vector")
 
-fit <- cmidecdf.fit(x = x, y = y, intercept = intercept, ecdf_est = ecdf_est, bws = bws, theta = theta)
+fit <- cmidecdf.fit(x = x, y = y, intercept = intercept, ecdf_est = ecdf_est, npc_args = npc_args, theta = theta)
 
 return(fit)
 
 }
 
-cmidecdf.fit <- function(x, y, intercept, ecdf_est, bws = NULL, theta = NULL){
+cmidecdf.fit <- function(x, y, intercept, ecdf_est, npc_args = list(), theta = NULL){
 
 	glm.ao <- function(x, y, theta){
 	k <- length(theta)
@@ -131,8 +131,10 @@ if(missing(intercept) & all(x[,1] == 1)) intercept <- TRUE
 
 if(ecdf_est == "npc"){
 	xnpc <- if(intercept) x[, 2:p, drop = FALSE] else x # remove intercept
-	flag <- is.null(bws)
-	bw <- try(npcdistbw(xdat = xnpc, ydat = ordered(y), bandwidth.compute = flag, oykertype = "wangvanryzin", bws = bws), silent = TRUE)
+	force_args <- list(xdat = xnpc, ydat = ordered(y), bandwidth.compute = is.null(npc_args$bws), oykertype = "wangvanryzin")
+    npc_add <- setdiff(names(npc_args), names(force_args))
+    npc_args <- c(force_args, npc_args[npc_add])
+	bw <- try(fastDoCall(npcdistbw, npc_args), silent = TRUE)
 	if(inherits(bw, "try-error")){
 		ecdf_est <- "logit"
 		warning("ecdf_est 'npc' failed, using 'logit' instead", "\n")
@@ -147,19 +149,35 @@ if(ecdf_est == "ao"){
 	fitbin <- apply(Z, 2, function(z, x, theta) suppressWarnings(glm.ao(x = x, y = z, theta = theta)), x = x, theta = theta)
 	Fhat <- sapply(fitbin, predict, type = "response")
 	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
-}
-
-if(ecdf_est == "identity"){
-	fitbin <- apply(Z, 2, function(z, x) suppressWarnings(lm(z ~ x - 1)), x = x)
-	Fhat <- sapply(fitbin, predict, type = "response")
-	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+	bhat <- sapply(fitbin, coef) # p x K
+	linkinv <- family(fitbin[[1]])$linkinv
 }
 
 if(ecdf_est %in% c("logit", "probit", "cloglog")){
 	fitbin <- apply(Z, 2, function(z, x, link) suppressWarnings(glm(z ~ x - 1, family = binomial(link))), x = x, link = ecdf_est)
 	Fhat <- sapply(fitbin, predict, type = "response")
 	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+	bhat <- sapply(fitbin, coef) # p x K
+	linkinv <- family(fitbin[[1]])$linkinv
 }
+
+if(ecdf_est == "identity"){
+	fitbin <- apply(Z, 2, function(z, x) suppressWarnings(lm(z ~ x - 1)), x = x)
+	Fhat <- sapply(fitbin, predict, type = "response")
+	Fse <- sapply(fitbin, function(x) predict(x, type = "response", se.fit = TRUE)$se.fit)
+	bhat <- sapply(fitbin, coef) # p x K
+	linkinv <- function(eta) eta
+}
+
+# rearrange if CDF is not monotone
+for(j in 1:n){
+	tmp <- Fhat[j,]
+	if(any(diff(tmp) < 0)){
+		sf <- rearrange(stepfun(yo, c(-Inf, tmp)))
+		Fhat[j,] <- sf(yo)
+	}
+}
+
 
 M <- apply(Fhat, 1, diff)
 if(ncol(Fhat) > 2) M <- t(M)
@@ -168,18 +186,18 @@ G <- cbind(Fhat[,1]/2, G)
 r <- c(max(G[,1]), min(G[,ncol(G)]))
 
 attr(G, "range") <- r
-bw <- if(ecdf_est == "npc") bw else NULL
+ecdf_fit <- if(ecdf_est == "npc") bw else list(coef = bhat, linkinv = linkinv)
 
-ans <- list(G = G, Fhat = Fhat, Fse = Fse, yo = yo, bw = bw, ecdf_est = ecdf_est)
+ans <- list(G = G, Fhat = Fhat, Fse = Fse, yo = yo, ecdf_fit = ecdf_fit, ecdf_est = ecdf_est)
 class(ans) <- "cmidecdf"
 
 return(ans)
 
 }
 
-midrqControl <- function(method = "Nelder-Mead", ecdf_est = "npc"){
+midrqControl <- function(method = "Nelder-Mead", ecdf_est = "npc", npc_args = list()){
 
-	list(method = method, ecdf_est = ecdf_est)
+	list(method = method, ecdf_est = ecdf_est, npc_args = npc_args)
 
 }
 
@@ -194,7 +212,7 @@ mf$drop.unused.levels <- TRUE
 mf[[1L]] <- quote(stats::model.frame)
 mf <- eval(mf, parent.frame())
 mt <- attr(mf, "terms")
-intercept <- attr(terms.formula(formula), "intercept") == 1
+intercept <- attr(terms.formula(formula, data = mf), "intercept") == 1
 y <- model.response(mf, "numeric")
 x <- model.matrix(mt, mf, contrasts)
 w <- as.vector(model.weights(mf))
@@ -249,7 +267,7 @@ if(p == 1 & intercept){
 
 	# Estimate mid-CDF if not provided
 	if(is.null(midFit)){
-		midFit <- cmidecdf.fit(x = x, y = y, ecdf_est = control$ecdf_est, theta = seq(0, 2, by = 0.05), bws = control$bws, intercept = intercept)
+		midFit <- cmidecdf.fit(x = x, y = y, intercept = intercept, ecdf_est = control$ecdf_est, npc_args = control$npc_args, theta = seq(0, 2, by = 0.05))
 	} else {control$ecdf_est <- midFit$ecdf_est}
 	if(type == 3){
 		# allowed range for tau
@@ -492,7 +510,7 @@ if(numerical){
 } else {
 	xb <- as.matrix(predict(object, type = "link")) # xb includes the offset
 	xx <- solve(crossprod(x))
-	rate <- if(object$midFit$ecdf_est == "npc") prod(object$midFit$bw$xbw)*n else 1
+	rate <- if(object$midFit$ecdf_est == "npc") prod(object$midFit$ecdf_fit$xbw)*n else 1
 	Fvec <- as.vector(object$midFit$Fhat)
 	r <- attr(G, "range")
 
@@ -506,7 +524,7 @@ if(numerical){
 
 		up <- apply(tau[j] - G, 1, function(x) which(x < 0)[1])
 		low <- up - 1
-		if(any(low == 0)) stop("Something went wrong. Perhaps tau is outside allowed range ", "[", round(r[1], 3), ", " , round(r[2], 3), "]")
+		if(any(low == 0) | any(is.na(low))) stop("Something went wrong. Perhaps tau is outside allowed range ", "[", round(r[1], 3), ", " , round(r[2], 3), "]")
 		nonZero <- c((low - 1)*n + 1:n, (up - 1)*n + 1:n)
 		
 		J2 <- jacobian(func = phi, x = Fvec[nonZero], Fvec = Fvec, nonZero = nonZero, Z = cbind(yo[low], yo[up]), method = "simple", w = x, n = n, k = K, tau = tau[j], yo = yo, offset = object$offset, binary = object$binary, lambda = object$lambda, method.args = list(eps = 1e-6))
@@ -557,7 +575,76 @@ return(object)
 
 }
 
+midq2q <- function(object, newdata, ...){
+
+tau <- object$tau
+nt <- length(tau)
+ecdf_fit <- object$midFit$ecdf_fit
+yo <- object$midFit$yo
+x <- model.matrix(object$formula[-2], newdata)
+n <- nrow(x)
+p <- ncol(x)
+xnpc <- if(object$intercept) x[, 2:p, drop = FALSE] else x
+if(object$midFit$ecdf_est == "npc"){
+	Fhat <- mapply(function(obj, x, y, n) npcdist(bws = obj, exdat = x, eydat = ordered(rep(y, n)))$condist, yo, MoreArgs = list(obj = ecdf_fit, x = xnpc, n = n))
+} else {
+	Fhat <- apply(x %*% ecdf_fit$coef, 2, ecdf_fit$linkinv)
+}
+
+# rearrange if CDF is not monotone
+for(j in 1:n){
+	tmp <- Fhat[j,]
+	if(any(diff(tmp) < 0)){
+		sf <- rearrange(stepfun(yo, c(-Inf, tmp)))
+		Fhat[j,] <- sf(yo)
+	}
+}
+
+M <- apply(Fhat, 1, diff)
+if (ncol(Fhat) > 2) 
+	M <- t(M)
+Ghat <- Fhat[, -1] - 0.5 * M
+Ghat <- cbind(Fhat[, 1]/2, Ghat)
+Hhat <- predict(object, newdata = newdata)
+csi <- tmp <- matrix(NA, n, nt)
+for(j in 1:n){
+	sel <- findInterval(Hhat[j,], yo, all.inside = TRUE)
+	low <- yo[sel] 
+	up <- yo[sel + 1] 
+	gamma <- (Hhat[j,] - low)/(up - low)
+	pstar <- as.numeric((1-gamma)*Ghat[j,sel] + gamma*Ghat[j,sel + 1])
+	sel <- findInterval(pstar, Ghat[j,])
+	csi[j,] <- ifelse(pstar > Fhat[j,sel], ceiling(Hhat[j,]), floor(Hhat[j,]))
+	tmp[j,] <- Fhat[j,sel]
+}
+colnames(csi) <- tau
+rownames(csi) <- rownames(x)
+attr(csi, "Fhat") <- tmp
+class(csi) <- "midq2q"
+
+return(csi)
+
+}
+
+
 # Plot and print functions
+
+plot.midq2q <- function(x, ..., xlab = "p", ylab = "Quantile", main = "Ordinary Quantile Function", sub = TRUE, verticals = TRUE, col.steps = "gray70", cex.points = 1, jumps = FALSE){
+
+n <- nrow(x)
+k <- ncol(x)
+Fhat <- attr(x, "Fhat")
+
+if(n > 1) par(mfrow = c(ceiling(n/3), min(c(2,n))))
+
+for(j in 1:n){
+	sf <- stepfun(Fhat[j,], c(x[j,], x[j,k]))
+	subtext <- paste("id = ", j)
+	plot.stepfun(sf, xlab = xlab, ylab = ylab, main = main, verticals = verticals, col = col.steps, cex.points = cex.points, col.points = col.steps, do.points = jumps, xlim = c(0,1), ...)
+	if(sub) mtext(text = subtext, side = 3, line = 0.5, cex = 0.8)
+}
+
+}
 
 plot.midecdf <- function(x, ..., ylab = "p", main = "Ordinary and Mid-ECDF", verticals = FALSE, col.01line = "gray70", col.steps = "gray70", col.midline ="black", cex.points = 1, lty.midline = 2, lwd = 1, jumps = FALSE){
 
@@ -1066,6 +1153,11 @@ if(interval){
 	yl3 <- range(c(x$shape$skewness[,sel]))
 	yl4 <- range(c(x$shape$shape[,sel]))
 }
+
+if(!all(is.finite(yl1))) yl1 <- NULL
+if(!all(is.finite(yl2))) yl2 <- NULL
+if(!all(is.finite(yl3))) yl3 <- NULL
+if(!all(is.finite(yl4))) yl4 <- NULL
 
 par(mfrow = c(2,2))
 plot(z[r], x$location$median[r,], ylab = "Median", type = type, ylim = yl1, ...)
@@ -1654,7 +1746,7 @@ for(j in 1:nq){
 	)
 	class(z) <- "rq"
 	z$na.action <- attr(mf, "na.action")
-	z$formula <- update(formula, newresponse ~ .)
+	z$formula <- stats::update(formula, newresponse ~ .)
 	z$terms <- mt
 	z$xlevels <- .getXlevels(mt, mf)
 	z$call <- call
@@ -1794,7 +1886,7 @@ for(j in 1:nq){
 	)
 	class(z) <- "rq"
 	z$na.action <- attr(mf, "na.action")
-	z$formula <- update(formula, newresponse ~ .)
+	z$formula <- stats::update(formula, newresponse ~ .)
 	z$terms <- mt
 	z$xlevels <- .getXlevels(mt, mf)
 	z$call <- call
@@ -2109,7 +2201,7 @@ for(j in 1:nq){
 	Fitted[,j] <- invmcjII(z$fitted.values, parhat[1,j], parhat[2,j], dbounded)
 	class(z) <- "rq"
 	z$na.action <- attr(mf, "na.action")
-	z$formula <- update(formula, newresponse ~ .)
+	z$formula <- stats::update(formula, newresponse ~ .)
 	z$terms <- mt
 	z$xlevels <- .getXlevels(mt, mf)
 	z$call <- call
@@ -2446,11 +2538,11 @@ flag <- !object$tsf %in% c("mcjII")
 nn <- if(flag) c(object$term.labels, "lambda") else c(object$term.labels, "lambda", "delta")
 
 if(nq == 1){
-	fit <- update(object, data = data[inds,])
+	fit <- stats::update(object, data = data[inds,])
 	val <- fit$coefficients
 	val <- if(flag) c(val, fit$lambda) else c(val, fit$eta)
 } else {
-	fit <- update(object, data = data[inds,])
+	fit <- stats::update(object, data = data[inds,])
 	val <- fit$coefficients
 	val <- if(flag) rbind(val, fit$lambda) else rbind(val, fit$eta)
 }
@@ -3083,7 +3175,7 @@ if (length(weights))
 s.lad <- fit.lad$fitted.values
 gamma <- fit.lad$coefficients
 
-#fit.lad <- rq(update.formula(formula, r.abs ~ .), tau = 0.5, data = data, method = method)
+#fit.lad <- rq(stats::update.formula(formula, r.abs ~ .), tau = 0.5, data = data, method = method)
 #data$s.lad <- fit.lad$fitted
 #gamma <- fit.lad$coefficients
 
@@ -3174,7 +3266,7 @@ all.obs <- rownames(object$x)
 n <- length(all.obs)
 nn <- dimnames(object$coefficients)[[1]]
 
-fit <- update(object, data = data[inds,])
+fit <- stats::update(object, data = data[inds,])
 val <- fit$coefficients
 
 val <- as.vector(val)
@@ -3435,11 +3527,10 @@ lambda <- 0
 nq <- length(tau)
 if (nq > 1) 
 	stop("One quantile at a time")
-if(tsf == "mcjII") stop("'mcjII' not available for rq.counts")
 
 call <- match.call()
 mf <- match.call(expand.dots = FALSE)
-m <- match(c("formula", "data", "subset", "weights", "na.action"), names(mf), 0L)
+m <- match(c("formula", "data", "subset", "weights", "na.action", "offset"), names(mf), 0L)
 mf <- mf[c(1L, m)]
 if (method == "model.frame")
 	return(mf)
@@ -3450,19 +3541,15 @@ mt <- attr(mf, "terms")
 
 x <- model.matrix(mt, mf, contrasts)
 y <- model.response(mf, "numeric")
-w <- as.vector(model.weights(mf))
-if (!is.null(w) && !is.numeric(w)) 
-  stop("'weights' must be a numeric vector")
-if(is.null(w))
-  w <- rep(1, length(y))
 
 p <- ncol(x)
 n <- nrow(x)
 term.labels <- colnames(x)
 
-if (is.null(offset)) 
-	offset <- rep(0, n)
-
+offset <- model.offset(mf)
+if(is.null(offset)) offset <- rep(0, n)
+w <- as.vector(model.weights(mf))
+if(is.null(w)) w <- rep(1, n)
 
 Fn <- function(x, cn){
 	xf <- floor(x)
@@ -3750,7 +3837,6 @@ addnoise <- function(x, centered = TRUE, B = 0.999)
 	
     return(z)
 }
-
 
 ##################################################
 ### Khmaladze and other tests

@@ -18,7 +18,7 @@ midrq.fit(x, y, offset, lambda, binary, midFit, type, tau, method)
 an object of class \code{\link{formula}}: a symbolic description of the model to be fitted.
 }
   \item{data}{
-an optional data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model. If not found in data, the variables are taken from environment(formula), typically the environment from which \code{rq.counts} is called.
+an optional data frame, list or environment (or object coercible by as.data.frame to a data frame) containing the variables in the model. If not found in data, the variables are taken from environment(formula), typically the environment from which \code{midrq} is called.
 }
   \item{tau}{
 quantile to be estimated. This can be a vector of quantiles in \code{midrq}, but must be one single quantile in \code{midrq.fit}.
