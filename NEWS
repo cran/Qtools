@@ -73,3 +73,8 @@ Version 1.5.3 (November 26, 2020)
 
 =============================================
 
+Version 1.5.4 (February 7, 2021)
+
+- Removed dependency on Gmisc after CRAN notified unsolved check problems with Gmisc
+
+=============================================
