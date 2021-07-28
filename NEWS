@@ -78,3 +78,11 @@ Version 1.5.4 (February 7, 2021)
 - Removed dependency on Gmisc after CRAN notified unsolved check problems with Gmisc
 
 =============================================
+
+Version 1.5.5 (July 28, 2021)
+
+- Fixed bug in dqc
+- Fixed bug in midq2q
+- Fixed bug in predict.midrq
+
+=============================================
