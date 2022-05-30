@@ -861,6 +861,33 @@ attr(val, "stderr") <- stderr
 return(val)
 }
 
+qexact <- function(x, probs = 0.5, level = 0.95){
+
+if(any(probs < 0) | any(probs > 1)) stop("Quantile index out of range: probs must be between 0 and 1")
+if(any(is.na(x))) warning("Missing values will be omitted")
+x <- as.numeric(na.omit(x))
+n <- length(x)
+z <- sort(x)
+C <- gtools::combinations(n = n, r = 2, v = 1:n, repeats.allowed = FALSE)
+nq <- length(probs)
+out <- array(NA, dim = c(nq, 4), dimnames = list(paste0(probs*100, "%"), c("quantile", "lower", "upper", "conf.level")))
+for(k in 1:nq){
+	xi <- quantile(x, type = 1, probs = probs[k], names = FALSE)
+	gamma <- pbinom(C[,2] - 1, size = n, prob = probs[k]) - pbinom(C[,1] - 1, size = n, prob = probs[k])
+	gammac <- gamma - level
+	if(all(gammac < 0)) stop(paste0("Quantile p = ", probs[k], ". Maximum confidence level for these data is ",	round(max(gamma), 3)))
+	sel <- gammac == min(gammac[gammac >= 0])
+	# if multiple solutions, take the narrowest CI
+	if(sum(sel) > 1){
+		sel <- which(sel)[which.min(z[C[sel,2]] - z[C[sel,1]])]
+	}
+	conf.level <- gamma[sel]
+	CI <- z[C[sel,]]
+	out[k,] <- c(xi, CI, conf.level)
+	}
+return(out)
+}
+
 ######################################################################
 ### Q-based statistics
 ######################################################################
@@ -955,7 +982,7 @@ val <- list()
 if(type == "rq"){
 	fitLs <- as.list(mc[fitLs %in% names(formals(rq))])
 	fitLs$data <- mf
-	fitLs$tau <- taus
+	fitLs$tau <- sort(taus) # rq automatically sorts tau, just enforcing here
 	val$fit <- do.call(rq, args = fitLs)
 }
 
@@ -963,11 +990,14 @@ if(type == "rqt"){
 	if(conditional & length(lambda) < length(taus)) stop(paste0("Length of 'lambda' must be ", length(taus), ". See details in '?qlss'"))
 	fitLs <- as.list(mc[fitLs %in% names(formals(tsrq))])
 	fitLs$data <- mf
-	fitLs$tau <- taus
+	fitLs$tau <- sort(taus) # rqt does not sort, but rq does, so...
 	val$fit <- do.call(tsrq, args = fitLs)
 }
 
-Fitted <- val$fit$fitted.values
+# sort wrt taus
+ii <- match(taus,fitLs$tau)
+Fitted <- val$fit$fitted.values[,ii]
+
 vec3 <- Fitted[,1:3]
 vecp <- Fitted[ , -c(1:3), drop = FALSE][ , 1:nq, drop = FALSE]
 vecq <- Fitted[ , -c(1:3), drop = FALSE][ , (nq+1):(2*nq), drop = FALSE]
@@ -1014,7 +1044,7 @@ probs <- object$probs
 nq <- length(probs)
 
 fit <- object$fit
-taus <- fit$tau
+taus <- c(1:3/4, probs, 1-probs)
 
 if(missing(newdata))
 	{x <- fit$x}	else {
@@ -1026,7 +1056,10 @@ if(missing(newdata))
 	x <- model.matrix(Terms, mf, contrasts.arg = fit$contrasts)
 }
 
+# sort wrt taus
+ii <- match(taus, fit$tau)
 Fitted <- x%*%fit$coefficients
+Fitted <- Fitted[,ii]
 
 vecp <- Fitted[ , -c(1:3), drop = FALSE][ , 1:nq, drop = FALSE]
 vecq <- Fitted[ , -c(1:3), drop = FALSE][ , (nq+1):(2*nq), drop = FALSE]
@@ -1043,7 +1076,8 @@ if(interval){
 	B <- lapply(fit.s, function(x) x$B)
 	
 	Fitted <- lapply(B, function(b,x) x%*%t(b), x = x)
-
+	Fitted <- Fitted[ii] # sort wrt to taus
+	
 	sdtrim <- function(u, trim){
 		sel1 <- u >= quantile(u, probs = trim/2, na.rm = TRUE)
 		sel2 <- u <= quantile(u, probs = 1-trim/2, na.rm = TRUE)
@@ -1087,7 +1121,7 @@ probs <- object$probs
 nq <- length(probs)
 
 fit <- object$fit
-taus <- fit$tau
+taus <- c(1:3/4, probs, 1-probs)
 tsf <- fit$tsf
 symm <- attributes(tsf)$symm
 dbounded <- attributes(tsf)$dbounded
@@ -1122,6 +1156,10 @@ if (isBounded) {
 		x.r), x.r = range(fit$y))
 }
 
+# sort wrt taus
+ii <- match(taus, fit$tau)
+Fitted <- Fitted[,ii]
+
 vecp <- Fitted[ , -c(1:3), drop = FALSE][ , 1:nq, drop = FALSE]
 vecq <- Fitted[ , -c(1:3), drop = FALSE][ , (nq+1):(2*nq), drop = FALSE]
 Me <- drop(Fitted[,2])
@@ -1148,6 +1186,7 @@ if(interval){
 				x.r), x.r = range(fit$y))
 		}
 	}
+	Fitted <- Fitted[ii] # sort wrt to taus
 }
 
 if(interval){
@@ -3225,6 +3264,7 @@ if (length(weights))
 r.lad <- fit.lad$residuals
 r.abs <- abs(fit.lad$residuals)
 beta <- fit.lad$coefficients
+p <- length(beta)
 
 #fit.lad <- rq(formula, tau = 0.5, data = data, method = method)
 #data$r.lad <- fit.lad$residuals
@@ -3255,13 +3295,13 @@ for (i in 1:nq) {
 #zeta <- rq(r.lad ~ s.lad - 1, tau = tau, data = data, method = method)$coefficients
 
 if (nq > 1){
-	coef <- apply(outer(matrix(gamma, nrow = 1), zeta, "*"), 3, function(x, b) x + b, b = beta)
+	coef <- apply(outer(matrix(gamma, nrow = 1), zeta, "*"), 3, function(x, b) x + b, b = beta, simplify = TRUE)
+	coef <- matrix(coef, nrow = p)
 	taulabs <- paste0("tau = ", format(round(tau, 3)))
 	dimnames(coef) <- list(dimnames(x)[[2]], taulabs)
 } else {
 	coef <- as.numeric(beta + zeta * gamma)
 }
-
 
 fit <- list(coefficients = coef, zeta = zeta, beta = beta, gamma = gamma, tau = tau)
 fit$na.action <- attr(mf, "na.action")
