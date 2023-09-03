@@ -23,9 +23,14 @@
 \alias{fastDoCall}
 \alias{boot.rrq}
 \alias{boot.rqt}
-\alias{se.rqt}
+\alias{se_rqt}
 \alias{qlssPredRq}
 \alias{qlssPredRqt}
+
+\alias{qprime}
+\alias{predict_llqr}
+\alias{coef_conquer}
+\alias{vcov_conquer}
 
 \alias{rcLoss}
 \alias{l1Loss}
