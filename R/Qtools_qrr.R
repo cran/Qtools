@@ -2,7 +2,7 @@
 # Quantile ratio regression
 ##################################################
 
-qrr <- function(formula, data, taus, start = "rq", tsf = "bc", symm = TRUE, dbounded = FALSE, linearize = TRUE, kernel = "Gaussian", maxIter = 10, epsilon = 1e-5, verbose = FALSE, method.rq = "fn", method.nlrq = "L-BFGS-B"){
+qrr <- function(formula, data, taus, start = "rq", beta = NULL, tsf = "bc", symm = TRUE, dbounded = FALSE, linearize = TRUE, kernel = "Gaussian", maxIter = 10, epsilon = 1e-5, verbose = FALSE, method.rq = "fn", method.nlrq = "L-BFGS-B"){
 
 cl <- match.call()
 
@@ -80,6 +80,18 @@ if(linearize){
 	mf <- data.frame(mf, x)
 }
 
+if(is.null(beta)) {
+	beta <- rep(0, ncol(x))
+	names(beta) <- paste0("b", 1:ncol(x))
+}
+
+if(!is.null(beta)) {
+	stopifnot(length(beta) == ncol(x))
+	names(beta) <- paste0("b", 1:ncol(x))
+}
+
+bhat2 <- beta
+
 iter <- 0
 h1 <- h2 <- NULL
 
@@ -103,7 +115,7 @@ if(linearize){
 	H1 <- (1 + exp(zhat))*H2
 } else {
 	mf$z <- y/H2
-	fit1 <- nlrq(ff1, tau = p1, data = mf, start = as.list(bhat1), method = method.nlrq)
+	fit1 <- nlrq(ff1, tau = p1, data = mf, start = as.list(bhat2), method = method.nlrq)
 	bhat1 <- coef(fit1)
 	H1 <- predict(fit1)*H2
 }
@@ -125,18 +137,19 @@ if(linearize){
 	H2 <- H1/(1 + exp(zhat))
 } else {
 	mf$z <- y/H1
-	fit2 <- nlrq(ff2, tau = p2, data = mf, start = as.list(bhat2), method = method.nlrq)
+	fit2 <- nlrq(ff2, tau = p2, data = mf, start = as.list(bhat1), method = method.nlrq)
 	bhat2 <- coef(fit2)
 	H2 <- predict(fit2)*H1
 }
 
 if(verbose) cat("gamma2", bhat2, "\n")
 
+iter <- iter + 1
+
 if(max(abs(bhat1 - bhat2)) < epsilon) {
 		cat("Algorithm converged", "\n")
 		break
 	}
-iter <- iter + 1
 }
 
 if(iter == maxIter) warning("Algorithm reached maximum number of iterations")
@@ -155,7 +168,7 @@ if(linearize){
 }
 
 names(bhat2) <- colnames(x)
-ans <- list(call = cl, formula = formula, coef = bhat2, p1 = p1, p2 = p2, omega1 = omega1, omega2 = omega2, ff1 = ff1, ff2 = ff2, data = mf.old, x = x, y = y, H1 = as.numeric(H1), H2 = as.numeric(H2), method.rq = method.rq, intercept = intercept, taus = taus, start = start, tsf = tsf, symm = symm, dbounded = dbounded, linearize = linearize, kernel = kernel, maxIter = maxIter, epsilon = epsilon, verbose = verbose, method.rq = method.rq, method.nlrq = method.nlrq)
+ans <- list(call = cl, formula = formula, coef = bhat2, p1 = p1, p2 = p2, omega1 = omega1, omega2 = omega2, ff1 = ff1, ff2 = ff2, data = mf.old, x = x, y = y, H1 = as.numeric(H1), H2 = as.numeric(H2), method.rq = method.rq, intercept = intercept, taus = taus, start = start, tsf = tsf, symm = symm, dbounded = dbounded, linearize = linearize, kernel = kernel, nit = iter, maxIter = maxIter, epsilon = epsilon, verbose = verbose, method.rq = method.rq, method.nlrq = method.nlrq)
 attr(ans, "linearize") <- linearize
 class(ans) <- "qrr"
 return(ans)
